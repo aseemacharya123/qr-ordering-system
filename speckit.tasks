@@ -1,0 +1,576 @@
+Implementation Tasks: QR + WhatsApp Ordering System
+
+PHASE 1: Project Setup
+
+Task 1
+Task ID: T1
+Task name: Create React + Vite project structure
+Objective: Set up the frontend project and required folder structure.
+Files to create or modify:
+- package.json
+- src/App.jsx
+- src/main.jsx
+- src/index.css
+- src/components/
+- src/pages/
+- src/services/
+- src/config/
+- src/utils/
+Step-by-step implementation instructions:
+1. Run `npm create vite@latest . -- --template react` in the workspace root if a Vite project is not already present.
+2. Install dependencies with `npm install`.
+3. Ensure `package.json` contains start and build scripts: `dev`, `build`, `preview`.
+4. Create the folders `src/components`, `src/pages`, `src/services`, `src/config`, `src/utils`.
+5. Create `src/App.jsx` with a basic React router or a simple component placeholder.
+6. Create `src/main.jsx` to render `<App />` into `document.getElementById('root')`.
+7. Create `src/index.css` with minimal mobile-first styles.
+8. Run `npm run dev` and verify the app loads locally.
+Acceptance criteria:
+- App runs locally.
+- Basic page renders.
+- Folder structure exists.
+Dependencies: none
+
+Task 2
+Task ID: T2
+Task name: Add business configuration
+Objective: Create reusable business configuration for multiple clients.
+Files to create or modify:
+- src/config/businesses.js
+Step-by-step implementation instructions:
+1. Create `src/config/businesses.js`.
+2. Add two sample business objects: `cafe-99` and `sharma-sweets`.
+3. Include keys: businessId, businessName, logoUrl, themeColor, currency, apiUrl, reviewLink, ownerPhone, isActive.
+4. Export the businesses object and a helper function to get business by slug.
+5. Use config values in components later instead of hardcoding business-specific strings.
+Acceptance criteria:
+- Each business has businessId, businessName, logoUrl, themeColor, currency, apiUrl, reviewLink, ownerPhone, isActive.
+- No business-specific values are hardcoded in components.
+Dependencies: Task 1
+
+Task 3
+Task ID: T3
+Task name: Add sample menu data for local development
+Objective: Allow frontend to work before Google Sheets integration.
+Files to create or modify:
+- src/config/sampleMenuData.js
+Step-by-step implementation instructions:
+1. Create `src/config/sampleMenuData.js`.
+2. Define sample categories and sample menu items.
+3. Ensure each category has id, name, displayOrder, isActive.
+4. Ensure each menu item has itemId, categoryId, itemName, description, price, imageUrl, vegType, isAvailable, displayOrder.
+5. Export categories and items for use by the MenuPage.
+Acceptance criteria:
+- Sample categories and items exist.
+- Items include name, price, description, imageUrl, categoryId, isAvailable.
+Dependencies: Task 1
+
+PHASE 2: Menu UI
+
+Task 4
+Task ID: T4
+Task name: Create MenuPage
+Objective: Create main page that reads business slug and table number.
+Files to create or modify:
+- src/pages/MenuPage.jsx
+- src/services/businessService.js
+Step-by-step implementation instructions:
+1. Create `src/pages/MenuPage.jsx`.
+2. Read the URL path or use `window.location.pathname` to extract the business slug.
+3. Use `URLSearchParams` to read `table` from the query string.
+4. Create `src/services/businessService.js` with a function to fetch business config by slug.
+5. If the slug is invalid or business is inactive, render a friendly error.
+6. Load sample menu data in the page for now.
+Acceptance criteria:
+- Business slug is read from URL.
+- Table number is read from query parameter.
+- Invalid business shows friendly error.
+Dependencies: Task 1, Task 2, Task 3
+
+Task 5
+Task ID: T5
+Task name: Create Header component
+Objective: Show business name, logo, and optional table number.
+Files to create or modify:
+- src/components/Header.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/Header.jsx`.
+2. Accept props: businessName, logoUrl, themeColor, tableNo.
+3. Render the business logo and name.
+4. If `tableNo` exists, render a small label `Table {tableNo}`.
+5. Add responsive mobile-first styling.
+Acceptance criteria:
+- Header shows business name.
+- Table number shows if available.
+- Mobile-friendly layout.
+Dependencies: Task 4
+
+Task 6
+Task ID: T6
+Task name: Create SearchBar component
+Objective: Allow customers to search menu items.
+Files to create or modify:
+- src/components/SearchBar.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/SearchBar.jsx`.
+2. Accept props: `searchTerm`, `onSearchChange`.
+3. Render an input field with placeholder text.
+4. Call `onSearchChange` when the input changes.
+5. Use the component in `MenuPage` to filter items by name.
+Acceptance criteria:
+- Search input updates search state.
+- Search works by item name.
+Dependencies: Task 4
+
+Task 7
+Task ID: T7
+Task name: Create CategoryTabs component
+Objective: Allow category-based browsing.
+Files to create or modify:
+- src/components/CategoryTabs.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/CategoryTabs.jsx`.
+2. Accept props: `categories`, `selectedCategoryId`, `onSelectCategory`.
+3. Render categories horizontally.
+4. Highlight the selected category.
+5. Notify the parent when a category is clicked.
+6. Use the selected category in `MenuPage` to filter the menu items.
+Acceptance criteria:
+- Categories render horizontally.
+- Selected category is highlighted.
+- Items filter by selected category.
+Dependencies: Task 3, Task 4
+
+Task 8
+Task ID: T8
+Task name: Create MenuItemCard component
+Objective: Show item details and Add button.
+Files to create or modify:
+- src/components/MenuItemCard.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/MenuItemCard.jsx`.
+2. Accept props: `item`, `onAddToCart`.
+3. Render item image, name, description, and price.
+4. Show an availability badge or disabled state if `isAvailable` is false.
+5. Disable the Add button for unavailable items.
+6. Use this component in `MenuPage`.
+Acceptance criteria:
+- Shows image, name, description, price.
+- Shows unavailable state.
+- Add button disabled for unavailable items.
+Dependencies: Task 4, Task 7
+
+PHASE 3: Cart
+
+Task 9
+Task ID: T9
+Task name: Implement cart state
+Objective: Manage add/remove/update quantity logic.
+Files to create or modify:
+- src/utils/localCart.js
+- src/pages/MenuPage.jsx
+Step-by-step implementation instructions:
+1. Create `src/utils/localCart.js` with functions: `addItem`, `removeItem`, `updateQuantity`, `calculateTotal`.
+2. Store cart state in `MenuPage` using `useState`.
+3. Add items to cart when `onAddToCart` is called.
+4. Implement quantity increase/decrease and removal logic.
+5. Keep total amount updated.
+Acceptance criteria:
+- Add item works.
+- Quantity increase/decrease works.
+- Item removal works.
+- Total amount calculates correctly.
+Dependencies: Task 8
+
+Task 10
+Task ID: T10
+Task name: Create CartDrawer component
+Objective: Show cart details and checkout action.
+Files to create or modify:
+- src/components/CartDrawer.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/CartDrawer.jsx`.
+2. Accept props: `cartItems`, `onQuantityChange`, `onRemoveItem`, `totalAmount`, `onCheckoutOpen`.
+3. Render each cart item with quantity controls and subtotal.
+4. Show total amount and checkout button.
+5. Provide a close action or hide/show logic.
+Acceptance criteria:
+- Shows all cart items.
+- Shows quantity controls.
+- Shows subtotal and total.
+- Checkout button visible.
+Dependencies: Task 9
+
+Task 11
+Task ID: T11
+Task name: Create sticky cart footer
+Objective: Show cart summary at bottom of mobile screen.
+Files to create or modify:
+- src/components/CartFooter.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/CartFooter.jsx`.
+2. Accept props: `itemCount`, `totalAmount`, `onOpenCart`.
+3. Render a sticky footer visible when cart has items.
+4. Display total items and total amount.
+5. Call `onOpenCart` when clicked.
+Acceptance criteria:
+- Footer appears when cart has items.
+- Shows total items and total amount.
+- Opens cart drawer.
+Dependencies: Task 9, Task 10
+
+PHASE 4: Checkout
+
+Task 12
+Task ID: T12
+Task name: Create CheckoutForm component
+Objective: Capture customer name and phone number.
+Files to create or modify:
+- src/components/CheckoutForm.jsx
+- src/utils/validation.js
+Step-by-step implementation instructions:
+1. Create `src/components/CheckoutForm.jsx`.
+2. Accept props: `customerName`, `customerPhone`, `onChange`, `onSubmit`, `errors`, `disabled`.
+3. Render input fields for name and phone.
+4. Create `src/utils/validation.js` with `validateIndianPhone` and `validateCheckoutForm`.
+5. Validate that name is not empty and phone matches Indian mobile pattern.
+6. Ensure checkout cannot submit with empty cart.
+Acceptance criteria:
+- Name required.
+- Phone required.
+- Indian phone validation.
+- Empty cart cannot submit.
+Dependencies: Task 9
+
+Task 13
+Task ID: T13
+Task name: Create order payload formatter
+Objective: Convert cart and customer data into backend payload.
+Files to create or modify:
+- src/utils/orderFormatter.js
+Step-by-step implementation instructions:
+1. Create `src/utils/orderFormatter.js`.
+2. Implement `formatOrderPayload` to build the expected API payload.
+3. Include businessId, businessName, tableNo, customerName, customerPhone, items, totalAmount, source.
+4. Ensure each item includes itemId, name, price, quantity, subtotal.
+Acceptance criteria:
+- Payload includes businessId, businessName, tableNo, customerName, customerPhone, items, totalAmount, source.
+- Items include itemId, name, price, quantity, subtotal.
+Dependencies: Task 12
+
+Task 14
+Task ID: T14
+Task name: Create order service
+Objective: Submit order to Apps Script API.
+Files to create or modify:
+- src/services/orderService.js
+Step-by-step implementation instructions:
+1. Create `src/services/orderService.js`.
+2. Implement `submitOrder(payload, apiUrl)` using `fetch` with POST and JSON headers.
+3. Return parsed JSON response.
+4. Handle errors and throw friendly error messages.
+5. Ensure cart is not cleared on failure.
+Acceptance criteria:
+- Sends POST request.
+- Handles success response.
+- Handles error response.
+- Does not clear cart on failure.
+Dependencies: Task 13
+
+Task 15
+Task ID: T15
+Task name: Create OrderSuccess screen
+Objective: Show success message after order placement.
+Files to create or modify:
+- src/components/OrderSuccess.jsx
+Step-by-step implementation instructions:
+1. Create `src/components/OrderSuccess.jsx`.
+2. Accept props: `orderId`, `onBackToMenu`.
+3. Render a success message and order ID.
+4. Provide a button or link back to the menu.
+Acceptance criteria:
+- Shows order ID.
+- Shows customer-friendly success message.
+- Provides back to menu option.
+Dependencies: Task 14
+
+PHASE 5: Apps Script Backend
+
+Task 16
+Task ID: T16
+Task name: Create Apps Script backend files
+Objective: Create backend script structure.
+Files to create or modify:
+- apps-script/Code.gs
+- apps-script/Config.gs
+- apps-script/SheetService.gs
+- apps-script/OrderService.gs
+- apps-script/CustomerService.gs
+- apps-script/WhatsAppService.gs
+- apps-script/ResponseService.gs
+Step-by-step implementation instructions:
+1. Create the `apps-script` folder.
+2. Create each file with placeholder functions and comments.
+3. Add `doPost` stub in `Code.gs`.
+4. Add placeholder provider token names in `Config.gs`.
+Acceptance criteria:
+- Files contain clear placeholder code.
+- Backend structure is documented.
+Dependencies: Task 1
+
+Task 17
+Task ID: T17
+Task name: Implement doPost order API
+Objective: Receive and validate order request.
+Files to create or modify:
+- apps-script/Code.gs
+- apps-script/OrderService.gs
+- apps-script/ResponseService.gs
+Step-by-step implementation instructions:
+1. In `Code.gs`, implement `doPost(e)` to parse `e.postData.contents`.
+2. Validate required fields: businessId, customerName, customerPhone, items, totalAmount.
+3. In `OrderService.gs`, add a function `handleOrderRequest(payload)`.
+4. In `ResponseService.gs`, add JSON success and error response helpers.
+5. Return a friendly error when validation fails.
+Acceptance criteria:
+- Parses JSON request.
+- Validates required fields.
+- Returns JSON response.
+- Handles invalid payload gracefully.
+Dependencies: Task 16
+
+Task 18
+Task ID: T18
+Task name: Implement Google Sheets order save
+Objective: Append order row to Orders sheet.
+Files to create or modify:
+- apps-script/SheetService.gs
+- apps-script/OrderService.gs
+Step-by-step implementation instructions:
+1. In `SheetService.gs`, implement a function to open the Orders sheet and append a row.
+2. In `OrderService.gs`, generate orderId using timestamp format `ORD-YYYYMMDD-HHMMSS`.
+3. Build the order row with orderId, dateTime, businessId, businessName, tableNo, customerName, customerPhone, itemsJson, totalAmount, status, paymentStatus, source.
+4. Append the row to the Orders sheet.
+Acceptance criteria:
+- Generates order ID.
+- Saves order row.
+- Stores items JSON.
+- Sets status New and paymentStatus Unpaid.
+Dependencies: Task 17
+
+Task 19
+Task ID: T19
+Task name: Implement customer save/update
+Objective: Store customer details.
+Files to create or modify:
+- apps-script/CustomerService.gs
+Step-by-step implementation instructions:
+1. In `CustomerService.gs`, add functions to find a customer row by customerPhone.
+2. If the customer does not exist, add a new row with customerPhone, customerName, firstOrderDate, lastOrderDate, totalOrders=1, totalSpend, optInWhatsApp=false, lastMessageSent=''.
+3. If the customer exists, update lastOrderDate, totalOrders, totalSpend, customerName, and optionally optInWhatsApp.
+Acceptance criteria:
+- Adds customer if new.
+- Updates lastOrderDate, totalOrders, totalSpend if existing.
+- Uses customerPhone as unique key.
+Dependencies: Task 18
+
+Task 20
+Task ID: T20
+Task name: Implement WhatsApp message formatter
+Objective: Prepare owner notification message.
+Files to create or modify:
+- apps-script/WhatsAppService.gs
+Step-by-step implementation instructions:
+1. In `WhatsAppService.gs`, add a function to format the owner message.
+2. Include order ID, businessName, customerName, customerPhone, tableNo if present, item names, quantities, subtotals, total.
+3. Choose a clean message layout that works in WhatsApp text.
+Acceptance criteria:
+- Message includes order ID, customer, phone, table, items, total.
+- Works even if table number is missing.
+Dependencies: Task 17
+
+Task 21
+Task ID: T21
+Task name: Implement WhatsApp provider placeholder
+Objective: Create provider integration placeholder without exposing secrets.
+Files to create or modify:
+- apps-script/WhatsAppService.gs
+- apps-script/Config.gs
+Step-by-step implementation instructions:
+1. In `Config.gs`, add placeholder token and endpoint keys like `WATI_API_TOKEN`, `WATI_API_URL`.
+2. In `WhatsAppService.gs`, implement `sendWhatsAppNotification(message, phone)` using placeholder behavior.
+3. If token is missing, log a warning and return a failure result without throwing.
+4. Ensure the order save still succeeds even when WhatsApp send fails.
+Acceptance criteria:
+- Uses placeholder API endpoint and token property.
+- Does not require real credentials to run basic order save.
+- WhatsApp failure does not fail saved order.
+Dependencies: Task 16, Task 20
+
+PHASE 6: Integration
+
+Task 22
+Task ID: T22
+Task name: Connect frontend to backend
+Objective: Use Apps Script API URL from business config.
+Files to create or modify:
+- src/config/businesses.js
+- src/services/orderService.js
+Step-by-step implementation instructions:
+1. Add `apiUrl` for each sample business in `businesses.js`.
+2. In `orderService.js`, use the provided business apiUrl when submitting orders.
+3. Ensure `MenuPage` passes the active business apiUrl to the order service.
+Acceptance criteria:
+- Order submits to correct business API URL.
+- Success screen shows returned order ID.
+Dependencies: Task 2, Task 14, Task 17
+
+Task 23
+Task ID: T23
+Task name: Add loading and error states
+Objective: Improve user experience during API call.
+Files to create or modify:
+- src/components/LoadingState.jsx
+- src/components/ErrorState.jsx
+- src/components/CheckoutForm.jsx
+Step-by-step implementation instructions:
+1. Create `LoadingState.jsx` with a simple spinner or loading text.
+2. Create `ErrorState.jsx` with a friendly error message display.
+3. In `CheckoutForm.jsx`, disable the submit button while order is submitting.
+4. Show error state if `submitOrder` fails.
+5. Preserve cart when a submission error occurs.
+Acceptance criteria:
+- Submit button disabled while placing order.
+- Friendly error shown on failure.
+- Cart remains intact if error occurs.
+Dependencies: Task 14, Task 15
+
+Task 24
+Task ID: T24
+Task name: Add invalid business handling
+Objective: Handle inactive or wrong business slug.
+Files to create or modify:
+- src/pages/NotFoundPage.jsx
+- src/pages/MenuPage.jsx
+Step-by-step implementation instructions:
+1. Create `NotFoundPage.jsx` with a friendly invalid business message.
+2. In `MenuPage.jsx`, render `NotFoundPage` when slug is invalid.
+3. Render a different message when the business is inactive.
+Acceptance criteria:
+- Invalid slug shows friendly message.
+- Inactive business shows “currently unavailable”.
+Dependencies: Task 4
+
+PHASE 7: Replication Readiness
+
+Task 25
+Task ID: T25
+Task name: Add README setup guide
+Objective: Document setup for new clients.
+Files to create or modify:
+- README.md
+Step-by-step implementation instructions:
+1. Create `README.md` in the workspace root.
+2. Add sections for project overview, local development, business config, Apps Script deployment, and testing.
+3. Document how to add a new business and how to generate QR URLs.
+Acceptance criteria:
+README includes:
+- How to add new business
+- How to copy Google Sheet
+- Required tabs
+- How to deploy Apps Script
+- How to generate QR URLs
+- How to test order
+Dependencies: Task 2, Task 16
+
+Task 26
+Task ID: T26
+Task name: Add Google Sheet template documentation
+Objective: Document sheet schema clearly.
+Files to create or modify:
+- docs/google-sheet-template.md
+Step-by-step implementation instructions:
+1. Create `docs/google-sheet-template.md`.
+2. List all required tabs and columns.
+3. Provide sample rows for each sheet.
+Acceptance criteria:
+- Lists all tabs.
+- Lists all columns.
+- Provides sample rows.
+Dependencies: Task 18, Task 19
+
+Task 27
+Task ID: T27
+Task name: Add QR URL documentation
+Objective: Explain QR generation for shop/table.
+Files to create or modify:
+- docs/qr-setup.md
+Step-by-step implementation instructions:
+1. Create `docs/qr-setup.md`.
+2. Explain the business slug URL pattern.
+3. Show examples for shop-level and table-level QR.
+4. Advise on dynamic QR generation.
+Acceptance criteria:
+- Shop QR example exists.
+- Table QR example exists.
+- Dynamic QR recommendation exists.
+Dependencies: Task 4
+
+Task 28
+Task ID: T28
+Task name: Add deployment documentation
+Objective: Explain frontend deployment.
+Files to create or modify:
+- docs/deployment.md
+Step-by-step implementation instructions:
+1. Create `docs/deployment.md`.
+2. Document Vercel deployment steps.
+3. Add Firebase Hosting alternative notes.
+4. Describe environment/config placeholders.
+Acceptance criteria:
+- Vercel deployment steps documented.
+- Firebase Hosting alternative documented.
+- Environment/config placeholders documented.
+Dependencies: Task 1, Task 16
+
+PHASE 8: Validation
+
+Task 29
+Task ID: T29
+Task name: Manual test happy path
+Objective: Validate full order journey.
+Files to create or modify: none
+Step-by-step implementation instructions:
+1. Run the frontend locally.
+2. Open a sample menu URL like `/menu/cafe-99`.
+3. Add items to cart.
+4. Enter valid customer details.
+5. Submit the order.
+6. Confirm the success screen shows an order ID.
+Acceptance criteria:
+- QR/menu URL opens.
+- Menu loads.
+- Cart works.
+- Checkout validates.
+- Order saves.
+- Success screen shows order ID.
+Dependencies: Task 22, Task 23
+
+Task 30
+Task ID: T30
+Task name: Manual test failure cases
+Objective: Validate error handling.
+Files to create or modify: none
+Step-by-step implementation instructions:
+1. Attempt checkout with an empty cart and verify it is blocked.
+2. Enter invalid phone number and verify validation prevents submit.
+3. Open an invalid business slug and verify friendly error.
+4. Simulate backend failure and verify friendly error appears and cart remains.
+5. Simulate WhatsApp send failure and verify order still saves.
+Acceptance criteria:
+- Empty cart blocked.
+- Invalid phone blocked.
+- Invalid business handled.
+- Backend failure shows friendly error.
+- WhatsApp failure does not delete order.
+Dependencies: Task 23, Task 24

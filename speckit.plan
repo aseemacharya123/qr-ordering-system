@@ -1,0 +1,291 @@
+Implementation Plan: Reusable QR + WhatsApp Ordering System
+
+Goal
+Build the simplest reusable mobile-first QR + WhatsApp ordering web app for small Indian businesses using React + Vite frontend, Google Apps Script backend, Google Sheets database, and official WhatsApp API provider.
+
+Mandatory Architecture
+React + Vite frontend
+→ Google Apps Script Web App API
+→ Google Sheets database
+→ Official WhatsApp Business API provider
+→ Optional SMS backup later
+
+Tech Stack
+Frontend:
+- React
+- Vite
+- JavaScript
+- Simple CSS first; Tailwind only if already installed
+- Mobile-first responsive layout
+
+Backend:
+- Google Apps Script Web App
+- doPost endpoint for order submission
+- Optional doGet endpoint for health check or menu fetch if needed
+
+Database:
+- Google Sheets
+
+Hosting:
+- Vercel preferred for simplest deployment
+- Firebase Hosting or Netlify acceptable
+
+WhatsApp:
+- WATI, Interakt, Twilio, Gupshup, AiSensy, or 360dialog
+- Abstract provider integration so it can be replaced later
+
+Recommended Project Structure
+
+src/
+  components/
+    Header.jsx
+    CategoryTabs.jsx
+    SearchBar.jsx
+    MenuItemCard.jsx
+    CartDrawer.jsx
+    CheckoutForm.jsx
+    OrderSuccess.jsx
+    ErrorState.jsx
+    LoadingState.jsx
+
+  pages/
+    MenuPage.jsx
+    NotFoundPage.jsx
+
+  services/
+    menuService.js
+    orderService.js
+    businessService.js
+
+  config/
+    businesses.js
+    apiConfig.js
+
+  utils/
+    currency.js
+    validation.js
+    orderFormatter.js
+    localCart.js
+
+  App.jsx
+  main.jsx
+  index.css
+
+Google Apps Script structure:
+- Code.gs
+- Config.gs
+- SheetService.gs
+- OrderService.gs
+- CustomerService.gs
+- WhatsAppService.gs
+- ResponseService.gs
+
+Google Sheets Data Model
+BusinessSettings:
+- businessId
+- businessName
+- businessType
+- ownerName
+- ownerPhone
+- whatsappProvider
+- googleReviewLink
+- currency
+- taxEnabled
+- deliveryEnabled
+- isActive
+
+Categories:
+- categoryId
+- categoryName
+- displayOrder
+- isActive
+
+MenuItems:
+- itemId
+- categoryId
+- itemName
+- description
+- price
+- imageUrl
+- vegType
+- isAvailable
+- displayOrder
+
+Orders:
+- orderId
+- dateTime
+- businessId
+- businessName
+- tableNo
+- customerName
+- customerPhone
+- itemsJson
+- totalAmount
+- status
+- paymentStatus
+- source
+
+Customers:
+- customerPhone
+- customerName
+- firstOrderDate
+- lastOrderDate
+- totalOrders
+- totalSpend
+- optInWhatsApp
+- lastMessageSent
+
+MarketingLog:
+- logId
+- customerPhone
+- campaignType
+- message
+- sentAt
+- status
+
+Frontend Requirements
+1. Read business slug from route.
+   Example:
+   /menu/cafe-99
+   /menu/cafe-99?table=5
+
+2. Load business config from businesses.js.
+
+3. Load menu data.
+   - For MVP, start with sample config/mock data during local development if Google Sheets or Apps Script is not ready.
+   - Then connect to Google Sheets/App Script once backend is available.
+
+4. Display:
+   - business header
+   - search bar
+   - category tabs
+   - menu item cards
+   - sticky cart footer
+   - cart drawer
+   - checkout form
+   - order success screen
+
+5. Cart:
+   - Add item
+   - Remove item
+   - Increase/decrease quantity
+   - Calculate subtotal and total
+   - Block checkout if cart is empty
+
+6. Checkout:
+   - Required customerName
+   - Required customerPhone
+   - Indian phone validation
+   - Capture tableNo from URL if present
+   - Submit order payload to Apps Script API
+
+7. Success:
+   - Show order ID
+   - Show message: “Your order has been placed successfully.”
+
+Backend Requirements
+Apps Script doPost must:
+1. Parse JSON request.
+2. Validate businessId, customerName, customerPhone, items, totalAmount.
+3. Generate orderId using timestamp-based format: ORD-YYYYMMDD-HHMMSS.
+4. Save order row in Orders sheet.
+5. Save/update customer row in Customers sheet.
+6. Set status = "New" and paymentStatus = "Unpaid" for each new order.
+7. Prepare owner WhatsApp message.
+8. Trigger WhatsApp provider API if configured, using placeholder behavior if credentials are missing.
+9. Log notification result if possible.
+10. Return JSON response with success true and orderId.
+
+Important Reliability Rule
+- Order saving must happen before WhatsApp notification.
+- If WhatsApp fails after order save, return:
+  { success: true, orderId: generated ID, notificationStatus: "failed" }
+- Do not block frontend/backend build if real WhatsApp credentials are missing.
+
+WhatsApp Message Format
+
+Owner message:
+New Order Received
+Order ID: {{orderId}}
+Business: {{businessName}}
+Table: {{tableNo}}
+Customer: {{customerName}}
+Phone: {{customerPhone}}
+
+Items:
+{{itemName}} x {{quantity}} = ₹{{subtotal}}
+
+Total: ₹{{totalAmount}}
+
+Customer thank-you message:
+Hi {{customerName}}, thank you for ordering from {{businessName}}.
+Your order ID is {{orderId}}.
+
+Security Plan
+- Do not expose WhatsApp token in React.
+- Store provider token in Apps Script Properties.
+- Validate incoming payload.
+- Do not store unnecessary customer data.
+- Keep CORS/response behavior simple for MVP.
+
+Error Handling Plan
+Frontend:
+- Show loading while order submits.
+- Disable button while submitting.
+- Show friendly error if API fails.
+- Preserve cart if submission fails.
+
+Backend:
+- Return consistent JSON:
+  { success: true, orderId: "..." }
+  { success: false, error: "friendly message" }
+
+Implementation Phases
+Phase 1: Frontend shell
+- React app setup
+- Routes
+- Business config
+- Menu page layout
+
+Phase 2: Menu and cart
+- Category tabs
+- Item cards
+- Cart state
+- Cart drawer
+
+Phase 3: Checkout
+- Form validation
+- Order payload
+- Success/error states
+
+Phase 4: Google Apps Script backend
+- doPost API
+- Save order
+- Save/update customer
+
+Phase 5: WhatsApp integration
+- Provider abstraction
+- Owner notification
+- Optional thank-you message
+
+Phase 6: Replication readiness
+- Sample business config with at least two businesses: cafe-99 and sharma-sweets
+- Sample Google Sheet schema
+- QR URL pattern using business slug and optional table param
+- README setup steps
+
+Development Style
+- Keep code beginner-friendly.
+- Avoid unnecessary abstractions.
+- Write clear file names.
+- Use comments only where helpful.
+- Do not ask many questions. Use MVP defaults.
+- If external credentials are missing, create placeholder variables and clearly mark where user must paste keys.
+
+Development Style
+- Keep code beginner-friendly.
+- Avoid unnecessary abstractions.
+- Write clear file names.
+- Use comments only where helpful.
+- Do not ask many questions. Use MVP defaults.
+- If external credentials are missing, create placeholder variables and clearly mark where user must paste keys.

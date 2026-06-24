@@ -1,0 +1,22 @@
+Architecture Review Checklist: QR + WhatsApp Ordering System
+
+Review Item | Result | Notes / Fix
+--- | --- | ---
+1. Architecture is simple and MVP-friendly. | Pass | Plan uses React + Vite frontend, Apps Script backend, Google Sheets DB, and official WhatsApp API provider.
+2. React frontend is separated from Apps Script backend. | Pass | Plan clearly separates frontend pages/services from Apps Script backend files.
+3. Google Sheets is used as MVP database. | Pass | Google Sheets is the planned storage layer with explicit tabs in the data model.
+4. Business-specific settings are config-driven. | Pass | `businesses.js` and sheet-driven BusinessSettings are defined for config-driven setup.
+5. No business-specific hardcoding inside reusable components. | Pass | Plan emphasizes reusable components and business settings via config.
+6. Order saving happens before WhatsApp notification. | Pass | Reliability rule explicitly requires order save before WhatsApp trigger.
+7. WhatsApp provider integration is abstracted enough to replace WATI/Interakt/Twilio later. | Pass | Plan calls for provider abstraction and configurable provider integration.
+8. Menu, cart, checkout, and success screens are clearly separated. | Pass | Separate components/pages are listed for menu, cart, checkout, and success.
+9. Google Sheets tabs match the planned data model. | Pass | Planned tabs include BusinessSettings, Categories, MenuItems, Orders, Customers, MarketingLog.
+10. QR URL supports both business slug and optional table number. | Pass | Plan includes route examples and table query capture behavior.
+11. New client onboarding requires minimal code changes. | Pass | Replication readiness phase and config-driven approach are included.
+12. Future Firebase/Firestore migration is not blocking MVP. | Pass | Plan explicitly avoids Firestore for MVP and leaves Firebase only for hosting if needed.
+13. Deployment path is simple. | Pass | Vercel preferred, Firebase Hosting or Netlify acceptable; simplest deployment recommended.
+14. Folder structure is beginner-friendly. | Pass | Recommended project structure is explicit and simple.
+15. Plan does not include out-of-scope features like payment, login, loyalty, or admin dashboard. | Pass | Out-of-scope list and no such features in the plan.
+
+Summary:
+All architecture checklist items pass under the current plan. The plan aligns with the constitution and MVP approach, and there are no remaining architecture blockers identified.

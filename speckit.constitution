@@ -1,0 +1,164 @@
+Project Constitution for QR + WhatsApp Ordering System
+
+CORE PRODUCT PRINCIPLES
+
+1. Build once, reuse for many businesses.
+The system must be a reusable template. A new business should require only configuration changes such as business name, logo, menu items, prices, WhatsApp number, Google Sheet ID, theme color, and QR URL.
+
+2. Keep the system simple.
+Avoid overengineering. Do not build enterprise-level architecture, microservices, Kubernetes, advanced admin panels, complex authentication, or heavy backend services for the MVP.
+
+3. Mobile-first experience is mandatory.
+Customers will mostly scan QR codes from mobile phones. Every screen must be optimized for small mobile screens first, then desktop later.
+
+4. No customer login.
+Customers must be able to browse menu, add items to cart, enter name and phone number, and place order without creating an account or signing in.
+
+5. WhatsApp-first communication.
+Shop owners are non-technical and mostly use WhatsApp. Order notifications must be designed around WhatsApp first. SMS can be backup only.
+
+6. Google Sheets-first MVP.
+For the MVP, Google Sheets is the preferred storage layer because shop owners can understand and update spreadsheet data easily. Firebase or Firestore should only be introduced later if scale, real-time dashboard, or authentication becomes necessary.
+
+7. Low-cost tools first.
+Prefer free or low-cost tools:
+- React + Vite for frontend
+- Google Sheets for data
+- Google Apps Script for API/backend
+- Vercel/Firebase Hosting/Netlify for deployment
+- WATI/Interakt/Twilio/Gupshup/AiSensy for official WhatsApp API
+- QR code generation using dynamic URLs
+
+8. Legal WhatsApp only.
+Do not use unofficial WhatsApp Web automation, browser scraping, or personal WhatsApp automation. Use only official WhatsApp Business Platform providers such as WATI, Interakt, Twilio, Gupshup, AiSensy, or 360dialog.
+
+9. Config-driven business onboarding.
+Business-specific information must not be hardcoded inside components. Use a configuration-driven approach for business slug, business ID, name, logo, theme, API URL, owner phone number, review link, and operating options.
+
+10. MVP must support these business types:
+- Cafe
+- Restaurant
+- Sweet shop
+- Kirana store
+- Cloud kitchen
+- Small takeaway outlet
+- Food stall
+
+TECHNICAL GUARDRAILS
+
+11. Preferred MVP architecture:
+React frontend → Google Apps Script API → Google Sheets → WhatsApp API provider.
+
+12. Frontend stack:
+Use React with Vite. Keep the app lightweight. Use simple CSS or Tailwind CSS if available. Avoid unnecessary UI libraries unless already installed.
+
+13. Backend stack:
+Use Google Apps Script Web App as the MVP backend API. It should handle order submission, order ID generation, Google Sheets row insertion, customer record update, and WhatsApp trigger.
+
+14. Data storage:
+Use Google Sheets tabs:
+- BusinessSettings
+- Categories
+- MenuItems
+- Orders
+- Customers
+- MarketingLog
+
+15. Required customer flow:
+QR scan → menu opens → customer browses categories → adds/removes items → views cart → enters name and phone → places order → sees success screen with order ID → shop owner receives WhatsApp notification.
+
+16. Required business flow:
+Shop owner can update menu items in Google Sheets without editing code.
+
+17. Required order fields:
+Order ID, date/time, business ID, table number or shop mode, customer name, customer phone, items JSON, total amount, status, payment status.
+
+18. Required customer fields:
+Customer phone, customer name, first order date, last order date, total orders, total spend, WhatsApp opt-in status, last message sent.
+
+19. Required notification fields:
+WhatsApp order alert must include order ID, customer name, customer phone, table number if available, item names, quantities, subtotal, and total amount.
+
+20. Payment rule:
+Do not implement online payment in MVP unless explicitly requested later. Default payment status should be Unpaid or Pay at Counter.
+
+21. Delivery rule:
+Do not implement full delivery tracking in MVP. Default scope is dine-in table ordering or takeaway ordering.
+
+22. Authentication rule:
+No customer authentication. No shop-owner login in MVP. Admin editing is via Google Sheets.
+
+23. Security rules:
+Never expose WhatsApp API tokens, Apps Script secrets, or provider credentials in frontend code. Secrets must stay in Apps Script properties, environment variables, or provider dashboards.
+
+24. Privacy rules:
+Collect only minimum required customer data: name and phone number. Do not collect address unless delivery is explicitly added later.
+
+25. Performance rules:
+Menu must load fast on mobile. Avoid large image files. Use compressed image URLs. Show loading and error states.
+
+26. Reliability rules:
+Order saving must happen before WhatsApp notification. If WhatsApp notification fails, order must still be saved in Google Sheets and the API should return a meaningful response.
+
+27. Error handling rules:
+Show customer-friendly errors. Do not expose technical stack traces to customers.
+
+28. Accessibility rules:
+Use readable font sizes, high contrast, clear buttons, and touch-friendly spacing.
+
+29. Code quality rules:
+Keep components small and readable. Prefer clear beginner-friendly code over clever code. Use descriptive names. Avoid unnecessary abstractions.
+
+30. Testing rules:
+At minimum, validate:
+- Menu loads
+- Category filter works
+- Add/remove cart works
+- Checkout required fields work
+- Order API saves data
+- Owner notification payload is generated
+- Success screen shows order ID
+
+31. Replication rules:
+A new client should be onboarded using this checklist:
+- Copy Google Sheet template
+- Add business settings
+- Add categories
+- Add menu items
+- Add owner WhatsApp number
+- Add Google review link
+- Add business config
+- Generate QR URLs
+- Test one order
+- Print QR code
+
+32. Scope control:
+MVP must not include:
+- Complex admin dashboard
+- Inventory management
+- Loyalty wallet
+- Delivery rider tracking
+- Advanced analytics dashboard
+- Multi-role authentication
+- Subscription billing automation
+- AI chatbot
+- Online payment
+These can be future premium add-ons.
+
+33. Default design style:
+Simple Swiggy/Zomato-like mobile UI:
+- Header with shop name/logo
+- Search bar
+- Category tabs
+- Food/product cards
+- Add button
+- Sticky cart footer
+- Cart drawer
+- Checkout form
+- Success screen
+
+34. Implementation behavior for AI assistant:
+Do not ask excessive questions. If information is missing, use sensible MVP defaults and document assumptions clearly. Ask the user only if a decision blocks implementation, such as missing API keys, missing Sheet ID, or missing deployment credentials.
+
+35. Final delivery expectation:
+The first implementation should create a working reusable template, not a perfect SaaS platform. Prioritize speed, reliability, simplicity, and easy replication.

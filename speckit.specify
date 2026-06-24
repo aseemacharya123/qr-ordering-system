@@ -1,0 +1,214 @@
+Feature: Reusable QR + WhatsApp Ordering System for Small Indian Businesses
+
+Build a mobile-first digital ordering web app that can be reused for multiple small businesses such as restaurants, cafes, kirana stores, sweet shops, food stalls, and takeaway counters.
+
+The goal is to create one reusable template system that can be configured quickly for each new business with minimal code changes.
+
+The end users are:
+1. Customers who scan a QR code and place an order from mobile.
+2. Shop owners who receive orders on WhatsApp and manage menu data from Google Sheets.
+3. The service provider/developer who replicates the same system for multiple clients.
+
+BUSINESS OBJECTIVE
+
+Small businesses in India need a simple digital menu and ordering system without installing apps, using complicated software, or learning technical tools. The system should allow customers to scan a QR code, view menu items, add items to cart, enter name and phone number, and place an order. The shop owner should instantly receive the order on WhatsApp.
+
+The system must be reusable so the same codebase can be sold to many businesses with small configuration changes.
+
+MVP SCOPE
+
+The MVP must include:
+
+1. Digital Menu Website
+- Mobile-first design.
+- Business logo/name/header.
+- Categories such as Starters, Main Course, Drinks, Sweets, Snacks, Grocery, etc.
+- Items with name, price, description, image, category, availability, and veg/non-veg/type indicator where applicable.
+- Search item functionality.
+- Simple UI similar to Swiggy/Zomato menu layout.
+- Menu data editable via Google Sheets, with sample config/mock data used during local MVP development if Sheets integration is not ready.
+
+2. QR Code Support
+- Each business has a unique menu URL.
+- Each table can have a unique QR URL using table number query parameter.
+- Example: /menu/cafe-99?table=5
+- Kirana/sweet shop can use shop-level QR without table.
+- QR should open the correct business menu.
+
+3. Cart and Checkout
+- Customer can add/remove items.
+- Customer can increase/decrease quantity.
+- Cart shows item names, quantity, subtotal, and total.
+- Checkout captures customer name and phone number.
+- No login required.
+- Order placement must show success screen with order ID.
+
+4. Order Storage
+- Store every order in Google Sheets.
+- Required order fields:
+  - orderId
+  - dateTime
+  - businessId
+  - businessName
+  - tableNo
+  - customerName
+  - customerPhone
+  - itemsJson
+  - totalAmount
+  - status
+  - paymentStatus
+  - source
+
+5. Customer Storage
+- Store or update customer details in Google Sheets.
+- Required customer fields:
+  - customerPhone
+  - customerName
+  - firstOrderDate
+  - lastOrderDate
+  - totalOrders
+  - totalSpend
+  - optInWhatsApp
+  - lastMessageSent
+
+6. WhatsApp Owner Notification
+- When an order is placed, the shop owner must receive a WhatsApp message.
+- Message must include:
+  - Order ID
+  - Customer name
+  - Customer phone
+  - Table number if available
+  - Items with quantity
+  - Total amount
+- Use official WhatsApp API provider only.
+- Implement provider abstraction and placeholder integration so the app builds even if real credentials are missing.
+- SMS backup can be planned but not mandatory for MVP implementation.
+
+7. Post-Order Customer Message
+- Send thank-you WhatsApp message to customer if legally allowed and configured.
+- Include order ID and business name.
+- Review link message can be supported as optional automation.
+
+8. Review Request Automation
+- Support Google review link in business settings.
+- After order completion or after manual trigger, system can send review request message.
+
+9. Marketing Automation Readiness
+- Design data model to support future inactive-customer campaigns.
+- Future trigger: if customer has not ordered for 15–20 days, send offer message.
+- Future trigger: festival/weekend offer messages.
+- Must include opt-in and opt-out considerations.
+
+10. Replication for Multiple Businesses
+- System must support multiple businesses using config.
+- Business-specific data should be kept in config and Google Sheets.
+- New business setup should not require rewriting components.
+
+PRIMARY USER STORIES
+
+User Story 1: Customer scans QR
+As a customer, I want to scan a QR code and open the correct shop/table menu so that I can place an order without asking for a physical menu.
+
+Acceptance Criteria:
+- QR URL opens the correct business menu.
+- If table number is present in URL, it is captured automatically.
+- If business is inactive or invalid, show a friendly error.
+
+User Story 2: Customer browses menu
+As a customer, I want to browse menu items by category so that I can quickly find what I want.
+
+Acceptance Criteria:
+- Categories are visible as tabs.
+- Items appear under selected category.
+- Search filters items by name.
+- Unavailable items cannot be added.
+
+User Story 3: Customer uses cart
+As a customer, I want to add, remove, and change item quantities so that I can prepare my order.
+
+Acceptance Criteria:
+- Add button adds item to cart.
+- Plus/minus changes quantity.
+- Total amount updates instantly.
+- Cart persists while browsing same session.
+
+User Story 4: Customer places order
+As a customer, I want to enter my name and phone number and place the order without login.
+
+Acceptance Criteria:
+- Name is required.
+- Phone number is required.
+- Phone number must be validated for Indian mobile format.
+- Empty cart cannot be submitted.
+- Success screen shows order ID.
+
+User Story 5: Owner receives order
+As a shop owner, I want to receive order details on WhatsApp so that I can prepare the order quickly.
+
+Acceptance Criteria:
+- Owner receives order alert after successful order save.
+- Alert contains customer details, items, quantities, and total.
+- If WhatsApp fails, order remains saved.
+
+User Story 6: Developer replicates system
+As the developer/service provider, I want to configure a new business quickly so that I can sell the same template to many clients.
+
+Acceptance Criteria:
+- Business settings are config-driven.
+- New business can be added by adding config and Google Sheet.
+- QR URLs can be generated for shop/table.
+- No component rewrite needed for each client.
+
+OUT OF SCOPE FOR MVP
+
+- Online payment
+- Customer login
+- Shop owner admin login
+- Full inventory management
+- Delivery rider tracking
+- Loyalty wallet
+- Advanced analytics dashboard
+- AI chatbot
+- Multi-branch enterprise management
+- Complex role-based permissions
+
+CLARIFICATIONS
+
+- Business model: reusable template system for multiple small businesses, not a full SaaS platform in MVP.
+- Primary business types: restaurants, cafes, kirana stores, sweet shops, takeaway counters, and food stalls.
+- Customer flow: QR scan → menu opens → select items → cart → enter name + phone → place order → success screen.
+- Order mode: support both table-based dine-in ordering and shop-level takeaway ordering.
+  - If `table` query parameter exists, capture table number.
+  - If `table` query parameter does not exist, treat as shop/takeaway order.
+- Login: no customer login; no shop-owner login in MVP.
+- Payment: no online payment in MVP; payment status defaults to Unpaid or Pay at Counter.
+- Backend: use Google Apps Script Web App as API backend.
+- Database: use Google Sheets as MVP database with tabs: BusinessSettings, Categories, MenuItems, Orders, Customers, MarketingLog.
+- WhatsApp: use official WhatsApp Business API provider only; owner notification is mandatory; customer thank-you and review request are optional but designed.
+- SMS: SMS backup is optional and can be planned for later.
+- Admin: shop owner edits menu in Google Sheets; no separate admin panel in MVP.
+- Multi-business support: use business slug and config-driven setup. Example URL: `/menu/cafe-99?table=5`.
+- Hosting: use Vercel, Firebase Hosting, or Netlify, preferring the easiest deployment.
+- UI: mobile-first, simple Swiggy/Zomato-like layout.
+- Reliability: order must be saved first; WhatsApp failure must not delete or block saved order.
+- Security: no API secrets in frontend; WhatsApp tokens remain server-side in Apps Script or provider dashboard.
+- Privacy: collect only name and phone number for MVP.
+- Replication: new client setup requires only copy Google Sheet template, fill settings/categories/items, add business config, generate QR code, test order, go live.
+
+DEFAULT ASSUMPTIONS
+
+- MVP uses React + Vite frontend.
+- MVP uses Google Sheets as database.
+- MVP uses Google Apps Script as backend API.
+- MVP uses official WhatsApp API provider such as WATI, Interakt, Twilio, Gupshup, or AiSensy.
+- Hosting can be Vercel, Firebase Hosting, or Netlify.
+- Images are stored as public URLs.
+- Menu editing is done directly in Google Sheets.
+- Order mode defaults to dine-in/table QR and takeaway/shop QR.
+- Default order status is New.
+- Payment status defaults to Unpaid.
+- Use two sample businesses in config: `cafe-99` and `sharma-sweets`.
+- Do not use Firestore for MVP; leave Firebase only for hosting if needed.
+- Use placeholder Apps Script property variables for WhatsApp provider tokens and credentials.
+
+Do not ask too many questions. Use these MVP assumptions unless something is truly blocking.
