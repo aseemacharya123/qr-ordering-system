@@ -2,7 +2,9 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   min-height: 100%;
   font-family: Inter, system-ui, sans-serif;
@@ -26,6 +28,7 @@ img {
 
 .container {
   padding: 16px;
+  padding-bottom: 100px;
 }
 
 .page-header {
@@ -40,6 +43,7 @@ img {
   border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 16px;
+  margin-bottom: 16px;
 }
 
 .small-tag {
@@ -137,4 +141,154 @@ img {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* =========================================
+   MENU ITEM CARD
+========================================= */
+
+.menu-item-card {
+  margin-bottom: 16px;
+}
+
+.menu-item-content {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.menu-item-details {
+  flex: 1;
+}
+
+.menu-item-details h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.menu-item-details p {
+  margin: 0 0 10px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.menu-item-price {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* =========================================
+   IMAGE SECTION
+========================================= */
+
+.menu-item-image-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* SMALLER PROFESSIONAL IMAGES */
+
+.menu-item-image {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* EMPTY PLACEHOLDER */
+
+.image-placeholder {
+  width: 90px;
+  height: 90px;
+  border-radius: 14px;
+  background: #f3f4f6;
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+  padding: 6px;
+}
+
+/* ADD BUTTON */
+
+.add-button {
+  background: #16a34a;
+  color: white;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.add-button:hover {
+  background: #15803d;
+}
+
+/* =========================================
+   CATEGORY TABS
+========================================= */
+
+.category-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.category-tab {
+  white-space: nowrap;
+  border: none;
+  background: #f3f4f6;
+  padding: 10px 16px;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.category-tab.active {
+  background: #4f46e5;
+  color: white;
+}
+
+/* =========================================
+   MOBILE RESPONSIVE
+========================================= */
+
+@media (max-width: 640px) {
+
+  .container {
+    padding: 12px;
+    padding-bottom: 100px;
+  }
+
+  .menu-item-image,
+  .image-placeholder {
+    width: 80px;
+    height: 80px;
+  }
+
+  .menu-item-details h3 {
+    font-size: 0.95rem;
+  }
+
+  .menu-item-details p {
+    font-size: 0.82rem;
+  }
+
+  .add-button {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+  }
 }
