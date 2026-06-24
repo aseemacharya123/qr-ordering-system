@@ -1,4 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import Header from '../components/Header.jsx';
 import SearchBar from '../components/SearchBar.jsx';
@@ -10,14 +14,9 @@ import CheckoutForm from '../components/CheckoutForm.jsx';
 import OrderSuccess from '../components/OrderSuccess.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ErrorState from '../components/ErrorState.jsx';
-import NotFoundPage from './NotFoundPage.jsx';
 
 import { getBusiness } from '../services/businessService.js';
-
-import {
-  categories as sampleCategories,
-  items as sampleItems,
-} from '../config/sampleMenuData.js';
+import { fetchMenu } from '../services/menuService.js';
 
 import {
   addItemToCart,
@@ -33,39 +32,59 @@ import { formatOrderPayload } from '../utils/orderFormatter.js';
 
 import { submitOrder } from '../services/orderService.js';
 
-function getSlugFromPath(path) {
-  const segments = path.split('/').filter(Boolean);
-
-  return segments.length >= 2
-    ? segments[1]
-    : null;
-}
+/* ========================================
+   HELPERS
+======================================== */
 
 function getTableNumber() {
-  const searchParams =
-    new URLSearchParams(window.location.search);
 
-  return searchParams.get('table') || '';
+  const searchParams =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  return (
+    searchParams.get('table') || ''
+  );
 }
 
+/* ========================================
+   COMPONENT
+======================================== */
+
 function MenuPage() {
+
+  /* ========================================
+     BUSINESS
+  ======================================== */
+
+  const slug = 'cafe-99';
+
+  const business =
+    getBusiness(slug);
+
+  const tableNo =
+    getTableNumber();
+
+  /* ========================================
+     STATES
+  ======================================== */
 
   const [searchTerm, setSearchTerm] =
     useState('');
 
-  const [selectedCategoryId, setSelectedCategoryId] =
-    useState(
-      () =>
-        sampleCategories.find(
-          (category) => category.isActive
-        )?.categoryId || ''
-    );
+  const [
+    selectedCategoryId,
+    setSelectedCategoryId,
+  ] = useState('');
 
   const [cartItems, setCartItems] =
     useState([]);
 
-  const [showCartDrawer, setShowCartDrawer] =
-    useState(false);
+  const [
+    showCartDrawer,
+    setShowCartDrawer,
+  ] = useState(false);
 
   const [customerName, setCustomerName] =
     useState('');
@@ -85,45 +104,156 @@ function MenuPage() {
   const [apiError, setApiError] =
     useState('');
 
-  const slug =
-    getSlugFromPath(window.location.pathname);
+  const [menuData, setMenuData] =
+    useState({
+      categories: [],
+      items: [],
+    });
 
-  const tableNo =
-    getTableNumber();
+  /* ========================================
+     LOAD MENU
+  ======================================== */
 
-  const business =
-    getBusiness(slug);
+  useEffect(() => {
 
-  const filteredCategories = useMemo(
-    () =>
-      sampleCategories
-        .filter((category) => category.isActive)
+    async function loadMenu() {
+
+      try {
+
+        const data =
+          await fetchMenu(
+            business.apiUrl
+          );
+
+        console.log(
+          'MENU DATA:',
+          data
+        );
+
+        setMenuData({
+          categories:
+            data.categories || [],
+          items:
+            data.items || [],
+        });
+
+      } catch (error) {
+
+        console.error(
+          'Menu fetch error:',
+          error
+        );
+      }
+    }
+
+    if (business?.apiUrl) {
+
+      loadMenu();
+    }
+
+  }, [business]);
+
+  /* ========================================
+     AUTO SELECT CATEGORY
+  ======================================== */
+
+  useEffect(() => {
+
+    if (
+      menuData.categories.length > 0 &&
+      !selectedCategoryId
+    ) {
+
+      setSelectedCategoryId(
+        menuData.categories[0]
+          .categoryId
+      );
+    }
+
+  }, [
+    menuData.categories,
+    selectedCategoryId,
+  ]);
+
+  /* ========================================
+     FILTERED CATEGORIES
+  ======================================== */
+
+  const filteredCategories =
+    useMemo(() => {
+
+      return (
+        menuData.categories || []
+      )
+        .filter((category) => {
+
+          return (
+            String(
+              category.isActive
+            )
+              .toLowerCase()
+              .trim() === 'true'
+          );
+        })
         .sort(
           (a, b) =>
-            a.displayOrder - b.displayOrder
-        ),
-    []
-  );
+            Number(a.displayOrder) -
+            Number(b.displayOrder)
+        );
 
-  const filteredItems = useMemo(() => {
+    }, [menuData.categories]);
 
-    return sampleItems
-      .filter(
-        (item) =>
-          item.categoryId === selectedCategoryId
+  /* ========================================
+     FILTERED ITEMS
+  ======================================== */
+
+  const filteredItems =
+    useMemo(() => {
+
+      return (
+        menuData.items || []
       )
-      .filter((item) => item.isAvailable)
-      .filter((item) =>
-        item.itemName
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())
-      )
-      .sort(
-        (a, b) =>
-          a.displayOrder - b.displayOrder
-      );
+        .filter(
+          (item) =>
+            String(item.categoryId)
+              .trim()
+              .toLowerCase() ===
+            String(selectedCategoryId)
+              .trim()
+              .toLowerCase()
+        )
+        .filter((item) => {
 
-  }, [searchTerm, selectedCategoryId]);
+          return (
+            String(
+              item.isAvailable
+            )
+              .toLowerCase()
+              .trim() === 'true'
+          );
+        })
+        .filter((item) =>
+          item.itemName
+            .toLowerCase()
+            .includes(
+              searchTerm.toLowerCase()
+            )
+        )
+        .sort(
+          (a, b) =>
+            Number(a.displayOrder) -
+            Number(b.displayOrder)
+        );
+
+    }, [
+      menuData.items,
+      selectedCategoryId,
+      searchTerm,
+    ]);
+
+  /* ========================================
+     TOTALS
+  ======================================== */
 
   const totalAmount =
     calculateCartTotal(cartItems);
@@ -131,10 +261,19 @@ function MenuPage() {
   const itemCount =
     getCartItemCount(cartItems);
 
-  const handleAddToCart = (item) => {
+  /* ========================================
+     CART ACTIONS
+  ======================================== */
+
+  const handleAddToCart = (
+    item
+  ) => {
 
     setCartItems((prevItems) =>
-      addItemToCart(prevItems, item)
+      addItemToCart(
+        prevItems,
+        item
+      )
     );
   };
 
@@ -152,12 +291,21 @@ function MenuPage() {
     );
   };
 
-  const handleRemoveItem = (itemId) => {
+  const handleRemoveItem = (
+    itemId
+  ) => {
 
     setCartItems((prevItems) =>
-      removeCartItem(prevItems, itemId)
+      removeCartItem(
+        prevItems,
+        itemId
+      )
     );
   };
+
+  /* ========================================
+     CHECKOUT
+  ======================================== */
 
   const handleCheckoutChange = (
     field,
@@ -170,112 +318,88 @@ function MenuPage() {
     });
 
     if (field === 'customerName') {
+
       setCustomerName(value);
     }
 
     if (field === 'customerPhone') {
+
       setCustomerPhone(value);
     }
   };
 
-  const handleSubmitOrder = async (
-    event
-  ) => {
+  /* ========================================
+     SUBMIT ORDER
+  ======================================== */
 
-    event.preventDefault();
+  const handleSubmitOrder =
+    async (event) => {
 
-    setApiError('');
+      event.preventDefault();
 
-    const newErrors =
-      validateCheckoutForm({
-        customerName,
-        customerPhone,
-        cartItems,
-      });
+      setApiError('');
 
-    setErrors(newErrors);
+      const newErrors =
+        validateCheckoutForm({
+          customerName,
+          customerPhone,
+          cartItems,
+        });
 
-    if (
-      Object.keys(newErrors).length > 0
-    ) {
-      return;
-    }
+      setErrors(newErrors);
 
-    const payload =
-      formatOrderPayload(
-        business,
-        tableNo,
-        customerName,
-        customerPhone,
-        cartItems
-      );
+      if (
+        Object.keys(newErrors)
+          .length > 0
+      ) {
 
-    setIsSubmitting(true);
+        return;
+      }
 
-    try {
-
-      console.log(
-        'Submitting Order...'
-      );
-
-      console.log(
-        'API URL:',
-        business.apiUrl
-      );
-
-      console.log(
-        'Payload:',
-        payload
-      );
-
-      // ✅ FINAL FIX
-      const response =
-        await submitOrder(
-          business.apiUrl,
-          payload
+      const payload =
+        formatOrderPayload(
+          business,
+          tableNo,
+          customerName,
+          customerPhone,
+          cartItems
         );
 
-      console.log(
-        'Response:',
-        response
-      );
+      setIsSubmitting(true);
 
-      setOrderId(response.orderId);
+      try {
 
-      setCartItems([]);
+        const response =
+          await submitOrder(
+            business.apiUrl,
+            payload
+          );
 
-      setShowCartDrawer(false);
+        setOrderId(
+          response.orderId
+        );
 
-    } catch (error) {
+        setCartItems([]);
 
-      console.error(error);
+        setShowCartDrawer(false);
 
-      setApiError(error.message);
+      } catch (error) {
 
-    } finally {
+        console.error(error);
 
-      setIsSubmitting(false);
+        setApiError(
+          error.message
+        );
 
-    }
-  };
+      } finally {
 
-  if (!slug || !business) {
+        setIsSubmitting(false);
+      }
+    };
 
-    return (
-      <NotFoundPage
-        message="This business is not available. Please use a valid QR menu URL."
-      />
-    );
-  }
-
-  if (!business.isActive) {
-
-    return (
-      <NotFoundPage
-        message="This business is currently unavailable. Please try again later."
-      />
-    );
-  }
+  /* ========================================
+     SUCCESS
+  ======================================== */
 
   if (orderId) {
 
@@ -289,23 +413,33 @@ function MenuPage() {
     );
   }
 
+  /* ========================================
+     UI
+  ======================================== */
+
   return (
 
     <div className="container">
 
       <Header
-        businessName={business.businessName}
+        businessName={
+          business.businessName
+        }
         logoUrl={business.logoUrl}
         tableNo={tableNo}
       />
 
       <SearchBar
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={
+          setSearchTerm
+        }
       />
 
       <CategoryTabs
-        categories={filteredCategories}
+        categories={
+          filteredCategories
+        }
         selectedCategoryId={
           selectedCategoryId
         }
@@ -318,7 +452,9 @@ function MenuPage() {
 
         <div
           className="empty-box card"
-          style={{ marginTop: '16px' }}
+          style={{
+            marginTop: '16px',
+          }}
         >
           No items found for this category or search.
         </div>
@@ -330,7 +466,9 @@ function MenuPage() {
           <MenuItemCard
             key={item.itemId}
             item={item}
-            onAddToCart={handleAddToCart}
+            onAddToCart={
+              handleAddToCart
+            }
           />
 
         ))
@@ -338,13 +476,19 @@ function MenuPage() {
       )}
 
       {apiError && (
-        <ErrorState message={apiError} />
+
+        <ErrorState
+          message={apiError}
+        />
+
       )}
 
       {isSubmitting && (
+
         <LoadingState
           message="Placing your order..."
         />
+
       )}
 
       <CartFooter
@@ -365,7 +509,9 @@ function MenuPage() {
         onQuantityChange={
           handleQuantityChange
         }
-        onRemoveItem={handleRemoveItem}
+        onRemoveItem={
+          handleRemoveItem
+        }
         onOpenCheckout={() =>
           setShowCartDrawer(false)
         }
@@ -373,16 +519,26 @@ function MenuPage() {
 
       <div
         className="card"
-        style={{ marginTop: '24px' }}
+        style={{
+          marginTop: '24px',
+        }}
       >
 
         <h2>Checkout</h2>
 
         <CheckoutForm
-          customerName={customerName}
-          customerPhone={customerPhone}
-          onChange={handleCheckoutChange}
-          onSubmit={handleSubmitOrder}
+          customerName={
+            customerName
+          }
+          customerPhone={
+            customerPhone
+          }
+          onChange={
+            handleCheckoutChange
+          }
+          onSubmit={
+            handleSubmitOrder
+          }
           errors={errors}
           disabled={isSubmitting}
         />
