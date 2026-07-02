@@ -1,0 +1,40 @@
+export const sampleDashboardSummary = {
+  monthlyRevenue: [
+    { month: '2026-02', revenue: 18400 },
+    { month: '2026-03', revenue: 21200 },
+    { month: '2026-04', revenue: 19800 },
+    { month: '2026-05', revenue: 24600 },
+    { month: '2026-06', revenue: 27300 },
+    { month: '2026-07', revenue: 9100 },
+  ],
+  categoryRevenue: [
+    { category: 'Starters', revenue: 22400 },
+    { category: 'Main Course', revenue: 38600 },
+    { category: 'Drinks', revenue: 14200 },
+    { category: 'Sweets', revenue: 9800 },
+    { category: 'Snacks', revenue: 11400 },
+  ],
+  topItems: [
+    { itemId: 'item_003', itemName: 'Paneer Butter Masala', quantity: 210, revenue: 54600 },
+    { itemId: 'item_001', itemName: 'Paneer Tikka', quantity: 180, revenue: 32400 },
+    { itemId: 'item_004', itemName: 'Veg Biryani', quantity: 140, revenue: 30800 },
+    { itemId: 'item_005', itemName: 'Cold Coffee', quantity: 165, revenue: 19800 },
+    { itemId: 'item_009', itemName: 'Aloo Samosa', quantity: 260, revenue: 10400 },
+  ],
+  bottomItems: [
+    { itemId: 'item_010', itemName: 'French Fries', quantity: 4, revenue: 440 },
+    { itemId: 'item_008', itemName: 'Rasgulla', quantity: 6, revenue: 540 },
+    { itemId: 'item_007', itemName: 'Gulab Jamun', quantity: 9, revenue: 720 },
+    { itemId: 'item_006', itemName: 'Fresh Lime Soda', quantity: 12, revenue: 1080 },
+    { itemId: 'item_002', itemName: 'Veg Spring Roll', quantity: 18, revenue: 2520 },
+  ],
+  totalOrders: 412,
+  totalRevenue: 120400,
+  totalCustomers: 186,
+  repeatCustomers: 54,
+  recentOrders: [
+    { orderId: 'ORD-20260702-101500', createdAt: new Date().toISOString(), customerName: 'Ramesh', tableNo: '5', totalAmount: 320 },
+    { orderId: 'ORD-20260702-095200', createdAt: new Date().toISOString(), customerName: 'Priya', tableNo: '', totalAmount: 540 },
+    { orderId: 'ORD-20260701-201000', createdAt: new Date().toISOString(), customerName: 'Arjun', tableNo: '2', totalAmount: 210 },
+  ],
+};

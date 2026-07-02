@@ -1,4 +1,4 @@
-export function formatOrderPayload(business, tableNo, customerName, customerPhone, cartItems) {
+export function formatOrderPayload(business, tableNo, customerName, customerPhone, cartItems, extraFields = {}) {
   const items = cartItems.map((item) => ({
     itemId: item.itemId,
     name: item.itemName,
@@ -18,5 +18,8 @@ export function formatOrderPayload(business, tableNo, customerName, customerPhon
     items,
     totalAmount,
     source: 'web',
+    age: extraFields.age || '',
+    gender: extraFields.gender || '',
+    society: extraFields.society || '',
   };
 }

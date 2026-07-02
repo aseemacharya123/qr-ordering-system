@@ -16,6 +16,8 @@ Two separate things get deployed: the **frontend** (React app, one deployment sh
    - `WHATSAPP_TOKEN`
    - `WHATSAPP_PHONE_NUMBER_ID`
    - `BUSINESS_OWNER_PHONE`
+   - `OWNER_PIN` — a **unique** PIN for this business's owner dashboard login. Never reuse the same PIN across clients.
+   - `ANTHROPIC_API_KEY` — Claude API key, for the AI insights panel on the owner dashboard (optional — the dashboard works without it, just without AI insights).
 
 Note: editing the script and clicking Save is not enough to update the live URL — you must create a **new deployment version** each time you change `Code.js`, or the web app keeps serving the old code.
 
@@ -38,6 +40,8 @@ Note: editing the script and clicking Save is not enough to update the live URL 
 
 - `src/config/businesses.js` — each business needs a real `apiUrl` (from the Apps Script deployment step above) before it will work; a placeholder URL will make orders fail silently with a friendly error.
 - Apps Script **Script Properties** (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `BUSINESS_OWNER_PHONE`) — until these are set, orders still save fine, but the owner will not receive a WhatsApp alert.
+- `OWNER_PIN` — until set, the owner dashboard login will always reject with "Incorrect PIN."
+- `ANTHROPIC_API_KEY` — until set, the dashboard's AI Insights panel shows a "not configured" message instead of generated insights; numeric analytics (revenue, categories, top/bottom items) work regardless.
 
 ## After deploying
 

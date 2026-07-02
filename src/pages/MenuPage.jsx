@@ -15,6 +15,9 @@ import OrderSuccess from '../components/OrderSuccess.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ErrorState from '../components/ErrorState.jsx';
 import NotFoundPage from './NotFoundPage.jsx';
+import LandingPage from './LandingPage.jsx';
+import OwnerLogin from './OwnerLogin.jsx';
+import OwnerDashboard from './OwnerDashboard.jsx';
 
 import { getBusiness } from '../services/businessService.js';
 import { fetchMenu } from '../services/menuService.js';
@@ -32,6 +35,7 @@ import { validateCheckoutForm } from '../utils/validation.js';
 import { formatOrderPayload } from '../utils/orderFormatter.js';
 
 import { submitOrder } from '../services/orderService.js';
+import { getToken, saveToken } from '../utils/ownerSession.js';
 
 /* ========================================
    HELPERS
@@ -70,6 +74,14 @@ function getBusinessSlug() {
   return '';
 }
 
+const DEFAULT_CHECKOUT_FIELDS = {
+  customerName: '',
+  customerPhone: '',
+  age: '',
+  gender: '',
+  society: '',
+};
+
 /* ========================================
    COMPONENT
 ======================================== */
@@ -92,6 +104,14 @@ function MenuPage() {
      STATES
   ======================================== */
 
+  const [view, setView] = useState(
+    tableNo ? 'customer' : 'landing'
+  );
+
+  const [ownerToken, setOwnerToken] = useState(
+    () => (business ? getToken(business.businessId) : '')
+  );
+
   const [searchTerm, setSearchTerm] =
     useState('');
 
@@ -108,11 +128,8 @@ function MenuPage() {
     setShowCartDrawer,
   ] = useState(false);
 
-  const [customerName, setCustomerName] =
-    useState('');
-
-  const [customerPhone, setCustomerPhone] =
-    useState('');
+  const [checkoutFields, setCheckoutFields] =
+    useState(DEFAULT_CHECKOUT_FIELDS);
 
   const [errors, setErrors] =
     useState({});
@@ -324,20 +341,46 @@ function MenuPage() {
     value
   ) => {
 
-    setErrors({
-      ...errors,
+    setErrors((prevErrors) => ({
+      ...prevErrors,
       [field]: '',
-    });
+    }));
 
-    if (field === 'customerName') {
+    setCheckoutFields((prevFields) => ({
+      ...prevFields,
+      [field]: value,
+    }));
+  };
 
-      setCustomerName(value);
+  /* ========================================
+     OWNER VIEW
+  ======================================== */
+
+  const handleSelectOrder = () => {
+    setView('customer');
+  };
+
+  const handleSelectOwner = () => {
+    const existingToken = getToken(business.businessId);
+
+    if (existingToken) {
+      setOwnerToken(existingToken);
+      setView('owner');
+      return;
     }
 
-    if (field === 'customerPhone') {
+    setView('ownerLogin');
+  };
 
-      setCustomerPhone(value);
-    }
+  const handleOwnerLoginSuccess = (token) => {
+    saveToken(business.businessId, token);
+    setOwnerToken(token);
+    setView('owner');
+  };
+
+  const handleOwnerLogout = () => {
+    setOwnerToken('');
+    setView('landing');
   };
 
   /* ========================================
@@ -353,8 +396,8 @@ function MenuPage() {
 
       const newErrors =
         validateCheckoutForm({
-          customerName,
-          customerPhone,
+          customerName: checkoutFields.customerName,
+          customerPhone: checkoutFields.customerPhone,
           cartItems,
         });
 
@@ -372,9 +415,14 @@ function MenuPage() {
         formatOrderPayload(
           business,
           tableNo,
-          customerName,
-          customerPhone,
-          cartItems
+          checkoutFields.customerName,
+          checkoutFields.customerPhone,
+          cartItems,
+          {
+            age: checkoutFields.age,
+            gender: checkoutFields.gender,
+            society: checkoutFields.society,
+          }
         );
 
       setIsSubmitting(true);
@@ -424,6 +472,44 @@ function MenuPage() {
 
     return (
       <NotFoundPage message="This business is currently unavailable." />
+    );
+  }
+
+  /* ========================================
+     LANDING / OWNER VIEWS
+  ======================================== */
+
+  if (view === 'landing') {
+
+    return (
+      <LandingPage
+        businessName={business.businessName}
+        logoUrl={business.logoUrl}
+        onSelectOrder={handleSelectOrder}
+        onSelectOwner={handleSelectOwner}
+      />
+    );
+  }
+
+  if (view === 'ownerLogin') {
+
+    return (
+      <OwnerLogin
+        apiUrl={business.apiUrl}
+        onLoginSuccess={handleOwnerLoginSuccess}
+        onBack={() => setView('landing')}
+      />
+    );
+  }
+
+  if (view === 'owner') {
+
+    return (
+      <OwnerDashboard
+        business={business}
+        token={ownerToken}
+        onLogout={handleOwnerLogout}
+      />
     );
   }
 
@@ -559,12 +645,7 @@ function MenuPage() {
         <h2 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '16px' }}>Checkout</h2>
 
         <CheckoutForm
-          customerName={
-            customerName
-          }
-          customerPhone={
-            customerPhone
-          }
+          fields={checkoutFields}
           onChange={
             handleCheckoutChange
           }

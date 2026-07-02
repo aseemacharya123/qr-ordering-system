@@ -1,4 +1,7 @@
 const WHATSAPP_API_VERSION = 'v17.0';
+const CLAUDE_MODEL = 'claude-opus-4-8';
+const OWNER_SESSION_TTL_SECONDS = 6 * 60 * 60;
+const AI_INSIGHTS_CACHE_TTL_SECONDS = 60 * 60;
 
 function doGet(e) {
   const action = e && e.parameter && e.parameter.action;
@@ -47,6 +50,10 @@ function readSheetAsObjects(sheetName) {
     });
 }
 
+/* ========================================
+   REQUEST ROUTING
+======================================== */
+
 function doPost(e) {
   try {
     const rawBody = e.postData && e.postData.contents;
@@ -55,35 +62,56 @@ function doPost(e) {
     }
 
     const payload = JSON.parse(rawBody);
-    const validation = validateOrderPayload(payload);
 
-    if (!validation.isValid) {
-      return buildJsonResponse({ success: false, error: validation.error });
+    switch (payload.action) {
+      case 'verifyOwnerPin':
+        return handleVerifyOwnerPin(payload);
+      case 'dashboard':
+        return handleDashboardRequest(payload);
+      case 'aiInsights':
+        return handleAiInsightsRequest(payload);
+      default:
+        return handleOrderSubmission(payload);
     }
-
-    const orderId = generateOrderId();
-    const orderRecord = {
-      orderId,
-      createdAt: new Date().toISOString(),
-      businessId: payload.businessId,
-      businessName: payload.businessName,
-      tableNo: payload.tableNo || '',
-      customerName: payload.customerName,
-      customerPhone: payload.customerPhone,
-      totalAmount: payload.totalAmount,
-      items: JSON.stringify(payload.items),
-      source: payload.source || 'web',
-    };
-
-    saveOrderToSheet(orderRecord);
-    saveOrUpdateCustomer(orderRecord);
-
-    const notificationStatus = sendWhatsAppNotificationSafely(orderRecord, payload);
-
-    return buildJsonResponse({ success: true, orderId, notificationStatus });
   } catch (error) {
-    return buildJsonResponse({ success: false, error: error.message || 'Order processing failed.' });
+    return buildJsonResponse({ success: false, error: error.message || 'Request processing failed.' });
   }
+}
+
+/* ========================================
+   ORDER SUBMISSION
+======================================== */
+
+function handleOrderSubmission(payload) {
+  const validation = validateOrderPayload(payload);
+
+  if (!validation.isValid) {
+    return buildJsonResponse({ success: false, error: validation.error });
+  }
+
+  const orderId = generateOrderId();
+  const orderRecord = {
+    orderId,
+    createdAt: new Date().toISOString(),
+    businessId: payload.businessId,
+    businessName: payload.businessName,
+    tableNo: payload.tableNo || '',
+    customerName: payload.customerName,
+    customerPhone: payload.customerPhone,
+    totalAmount: payload.totalAmount,
+    items: JSON.stringify(payload.items),
+    source: payload.source || 'web',
+    age: payload.age || '',
+    gender: payload.gender || '',
+    society: payload.society || '',
+  };
+
+  saveOrderToSheet(orderRecord);
+  saveOrUpdateCustomer(orderRecord);
+
+  const notificationStatus = sendWhatsAppNotificationSafely(orderRecord, payload);
+
+  return buildJsonResponse({ success: true, orderId, notificationStatus });
 }
 
 function validateOrderPayload(payload) {
@@ -167,6 +195,17 @@ function saveOrUpdateCustomer(orderRecord) {
       sheet.getRange(rowIndex, 4).setValue(orderRecord.createdAt);
       sheet.getRange(rowIndex, 5).setValue(totalOrders);
       sheet.getRange(rowIndex, 6).setValue(totalSpend);
+
+      if (orderRecord.age) {
+        sheet.getRange(rowIndex, 9).setValue(orderRecord.age);
+      }
+      if (orderRecord.gender) {
+        sheet.getRange(rowIndex, 10).setValue(orderRecord.gender);
+      }
+      if (orderRecord.society) {
+        sheet.getRange(rowIndex, 11).setValue(orderRecord.society);
+      }
+
       return;
     }
   }
@@ -180,6 +219,9 @@ function saveOrUpdateCustomer(orderRecord) {
     orderRecord.totalAmount,
     false,
     '',
+    orderRecord.age || '',
+    orderRecord.gender || '',
+    orderRecord.society || '',
   ]);
 }
 
@@ -198,11 +240,264 @@ function getCustomersSheet() {
       'Total Spend',
       'Opt-In WhatsApp',
       'Last Message Sent',
+      'Age',
+      'Gender',
+      'Society',
     ]);
   }
 
   return sheet;
 }
+
+/* ========================================
+   OWNER AUTH
+======================================== */
+
+function handleVerifyOwnerPin(payload) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const ownerPin = scriptProperties.getProperty('OWNER_PIN');
+
+  if (!ownerPin || !payload.pin || String(payload.pin) !== String(ownerPin)) {
+    return buildJsonResponse({ success: false, error: 'Incorrect PIN.' });
+  }
+
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put(`owner_session_${token}`, 'valid', OWNER_SESSION_TTL_SECONDS);
+
+  return buildJsonResponse({ success: true, token });
+}
+
+function isValidOwnerToken(token) {
+  if (!token) {
+    return false;
+  }
+
+  return CacheService.getScriptCache().get(`owner_session_${token}`) === 'valid';
+}
+
+/* ========================================
+   OWNER DASHBOARD
+======================================== */
+
+function handleDashboardRequest(payload) {
+  if (!isValidOwnerToken(payload.token)) {
+    return buildJsonResponse({ success: false, error: 'Unauthorized' });
+  }
+
+  return buildJsonResponse({
+    success: true,
+    summary: buildOrderSummary(),
+  });
+}
+
+function buildOrderSummary() {
+  const orders = readSheetAsObjects('Orders');
+  const menuItems = readSheetAsObjects('MenuItems');
+  const categories = readSheetAsObjects('Categories');
+  const customers = readSheetAsObjects('Customers');
+
+  const menuItemsById = {};
+  menuItems.forEach((item) => {
+    menuItemsById[String(item.itemId)] = item;
+  });
+
+  const categoryNameById = {};
+  categories.forEach((category) => {
+    categoryNameById[String(category.categoryId)] = category.categoryName;
+  });
+
+  const monthlyRevenue = {};
+  const categoryRevenue = {};
+  const itemStats = {};
+
+  orders.forEach((order) => {
+    const totalAmount = Number(order['Total Amount'] || 0);
+    const monthKey = getMonthKey(order['Created At']);
+
+    if (monthKey) {
+      monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + totalAmount;
+    }
+
+    let items = [];
+    try {
+      items = JSON.parse(order['Items'] || '[]');
+    } catch (error) {
+      items = [];
+    }
+
+    items.forEach((lineItem) => {
+      const itemId = String(lineItem.itemId);
+      const menuItem = menuItemsById[itemId];
+      const categoryId = menuItem ? String(menuItem.categoryId) : '';
+      const categoryName = categoryNameById[categoryId] || 'Uncategorized';
+      const subtotal = Number(lineItem.subtotal || 0);
+
+      categoryRevenue[categoryName] = (categoryRevenue[categoryName] || 0) + subtotal;
+
+      if (!itemStats[itemId]) {
+        itemStats[itemId] = {
+          itemId,
+          itemName: lineItem.name || (menuItem && menuItem.itemName) || itemId,
+          quantity: 0,
+          revenue: 0,
+        };
+      }
+
+      itemStats[itemId].quantity += Number(lineItem.quantity || 0);
+      itemStats[itemId].revenue += subtotal;
+    });
+  });
+
+  menuItems.forEach((menuItem) => {
+    const itemId = String(menuItem.itemId);
+    if (!itemStats[itemId]) {
+      itemStats[itemId] = {
+        itemId,
+        itemName: menuItem.itemName,
+        quantity: 0,
+        revenue: 0,
+      };
+    }
+  });
+
+  const itemPerformance = Object.values(itemStats);
+  const topItems = [...itemPerformance].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const bottomItems = [...itemPerformance].sort((a, b) => a.revenue - b.revenue).slice(0, 5);
+
+  const totalRevenue = orders.reduce((sum, order) => sum + Number(order['Total Amount'] || 0), 0);
+  const repeatCustomers = customers.filter((customer) => Number(customer['Total Orders'] || 0) > 1).length;
+
+  return {
+    monthlyRevenue: Object.keys(monthlyRevenue).sort().map((month) => ({
+      month,
+      revenue: monthlyRevenue[month],
+    })),
+    categoryRevenue: Object.keys(categoryRevenue).map((name) => ({
+      category: name,
+      revenue: categoryRevenue[name],
+    })),
+    topItems,
+    bottomItems,
+    totalOrders: orders.length,
+    totalRevenue,
+    totalCustomers: customers.length,
+    repeatCustomers,
+    recentOrders: orders.slice(-50).reverse().map((order) => ({
+      orderId: order['Order ID'],
+      createdAt: order['Created At'],
+      customerName: order['Customer Name'],
+      tableNo: order['Table No'],
+      totalAmount: order['Total Amount'],
+    })),
+  };
+}
+
+function getMonthKey(isoDateString) {
+  if (!isoDateString) {
+    return '';
+  }
+
+  const date = new Date(isoDateString);
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+}
+
+/* ========================================
+   AI INSIGHTS
+======================================== */
+
+function handleAiInsightsRequest(payload) {
+  if (!isValidOwnerToken(payload.token)) {
+    return buildJsonResponse({ success: false, error: 'Unauthorized' });
+  }
+
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ai_insights_cache';
+
+  if (!payload.forceRefresh) {
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return buildJsonResponse({ success: true, insights: cached, cached: true });
+    }
+  }
+
+  const summary = buildOrderSummary();
+  const insights = generateAiInsights(summary);
+
+  cache.put(cacheKey, insights, AI_INSIGHTS_CACHE_TTL_SECONDS);
+
+  return buildJsonResponse({ success: true, insights, cached: false });
+}
+
+function generateAiInsights(summary) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const apiKey = scriptProperties.getProperty('ANTHROPIC_API_KEY');
+
+  if (!apiKey) {
+    return 'AI insights are not configured yet. Add an ANTHROPIC_API_KEY script property to enable this.';
+  }
+
+  const prompt = buildInsightsPrompt(summary);
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    payload: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      output_config: { effort: 'medium' },
+      messages: [
+        { role: 'user', content: prompt },
+      ],
+    }),
+    muteHttpExceptions: true,
+  };
+
+  try {
+    const response = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', options);
+    const responseCode = response.getResponseCode();
+
+    if (responseCode < 200 || responseCode >= 300) {
+      Logger.log(`Claude API error: ${responseCode} ${response.getContentText()}`);
+      return 'Could not generate insights right now. Please try again later.';
+    }
+
+    const responseBody = JSON.parse(response.getContentText());
+
+    if (responseBody.stop_reason === 'refusal') {
+      return 'The AI declined to generate insights for this data. Please try again later.';
+    }
+
+    const textBlock = (responseBody.content || []).find((block) => block.type === 'text');
+    return textBlock ? textBlock.text : 'No insights were generated.';
+  } catch (error) {
+    Logger.log(`Claude API request failed: ${error.message}`);
+    return 'Could not generate insights right now. Please try again later.';
+  }
+}
+
+function buildInsightsPrompt(summary) {
+  return [
+    'You are a friendly business consultant helping a small Indian restaurant/cafe owner understand their sales data.',
+    'The owner is not technical. Give 3 to 5 concrete, actionable recommendations they could act on this week, in plain simple language.',
+    'Reference specific numbers from the data below where useful. Keep it concise. Suggest WhatsApp-based marketing ideas where relevant, since that is their main customer channel.',
+    '',
+    'Sales data (JSON):',
+    JSON.stringify(summary),
+  ].join('\n');
+}
+
+/* ========================================
+   WHATSAPP NOTIFICATION
+======================================== */
 
 function sendWhatsAppNotificationSafely(orderRecord, payload) {
   try {
