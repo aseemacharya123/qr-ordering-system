@@ -4,7 +4,7 @@ function CheckoutForm({ customerName, customerPhone, onChange, onSubmit, errors,
   return (
     <form onSubmit={onSubmit} style={{ display: 'grid', gap: '16px' }}>
       <div>
-        <label htmlFor="customerName" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Name</label>
+        <label htmlFor="customerName" style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>Name</label>
         <input
           id="customerName"
           name="customerName"
@@ -17,7 +17,7 @@ function CheckoutForm({ customerName, customerPhone, onChange, onSubmit, errors,
       </div>
 
       <div>
-        <label htmlFor="customerPhone" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Phone</label>
+        <label htmlFor="customerPhone" style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>Phone</label>
         <input
           id="customerPhone"
           name="customerPhone"
@@ -31,8 +31,8 @@ function CheckoutForm({ customerName, customerPhone, onChange, onSubmit, errors,
 
       {errors.cart && <div className="error-text">{errors.cart}</div>}
 
-      <button type="submit" className="button button-primary" disabled={disabled}>
-        Place Order
+      <button type="submit" className="button button-primary button-block" disabled={disabled}>
+        {disabled ? 'Placing order...' : 'Place Order'}
       </button>
     </form>
   );

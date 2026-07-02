@@ -1,12 +1,50 @@
 const WHATSAPP_API_VERSION = 'v17.0';
 
-function doGet() {
+function doGet(e) {
+  const action = e && e.parameter && e.parameter.action;
+
+  if (action === 'menu') {
+    return buildJsonResponse({
+      success: true,
+      categories: readSheetAsObjects('Categories'),
+      items: readSheetAsObjects('MenuItems'),
+    });
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({
       success: true,
       message: 'QR WhatsApp ordering backend is running.',
     }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function readSheetAsObjects(sheetName) {
+  const spreadSheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = spreadSheet.getSheetByName(sheetName);
+
+  if (!sheet) {
+    Logger.log(`${sheetName} sheet not found.`);
+    return [];
+  }
+
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length < 2) {
+    return [];
+  }
+
+  const headers = values[0];
+
+  return values.slice(1)
+    .filter((row) => row.some((cell) => cell !== '' && cell !== null))
+    .map((row) => {
+      const record = {};
+      headers.forEach((header, index) => {
+        record[header] = row[index];
+      });
+      return record;
+    });
 }
 
 function doPost(e) {
@@ -38,9 +76,11 @@ function doPost(e) {
     };
 
     saveOrderToSheet(orderRecord);
-    sendWhatsAppNotification(orderRecord, payload);
+    saveOrUpdateCustomer(orderRecord);
 
-    return buildJsonResponse({ success: true, orderId });
+    const notificationStatus = sendWhatsAppNotificationSafely(orderRecord, payload);
+
+    return buildJsonResponse({ success: true, orderId, notificationStatus });
   } catch (error) {
     return buildJsonResponse({ success: false, error: error.message || 'Order processing failed.' });
   }
@@ -67,8 +107,11 @@ function validateOrderPayload(payload) {
 }
 
 function generateOrderId() {
-  const timestamp = new Date().getTime();
-  return `ORDER-${timestamp}`;
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `ORD-${datePart}-${timePart}`;
 }
 
 function saveOrderToSheet(orderRecord) {
@@ -110,6 +153,66 @@ function getOrdersSheet() {
   return sheet;
 }
 
+function saveOrUpdateCustomer(orderRecord) {
+  const sheet = getCustomersSheet();
+  const values = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(orderRecord.customerPhone)) {
+      const rowIndex = i + 1;
+      const totalOrders = Number(values[i][4] || 0) + 1;
+      const totalSpend = Number(values[i][5] || 0) + Number(orderRecord.totalAmount);
+
+      sheet.getRange(rowIndex, 2).setValue(orderRecord.customerName);
+      sheet.getRange(rowIndex, 4).setValue(orderRecord.createdAt);
+      sheet.getRange(rowIndex, 5).setValue(totalOrders);
+      sheet.getRange(rowIndex, 6).setValue(totalSpend);
+      return;
+    }
+  }
+
+  sheet.appendRow([
+    orderRecord.customerPhone,
+    orderRecord.customerName,
+    orderRecord.createdAt,
+    orderRecord.createdAt,
+    1,
+    orderRecord.totalAmount,
+    false,
+    '',
+  ]);
+}
+
+function getCustomersSheet() {
+  const spreadSheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadSheet.getSheetByName('Customers');
+
+  if (!sheet) {
+    sheet = spreadSheet.insertSheet('Customers');
+    sheet.appendRow([
+      'Customer Phone',
+      'Customer Name',
+      'First Order Date',
+      'Last Order Date',
+      'Total Orders',
+      'Total Spend',
+      'Opt-In WhatsApp',
+      'Last Message Sent',
+    ]);
+  }
+
+  return sheet;
+}
+
+function sendWhatsAppNotificationSafely(orderRecord, payload) {
+  try {
+    return sendWhatsAppNotification(orderRecord, payload);
+  } catch (error) {
+    Logger.log(`WhatsApp notification failed: ${error.message}`);
+    return 'failed';
+  }
+}
+
 function sendWhatsAppNotification(orderRecord, payload) {
   const scriptProperties = PropertiesService.getScriptProperties();
   const token = scriptProperties.getProperty('WHATSAPP_TOKEN');
@@ -118,7 +221,7 @@ function sendWhatsAppNotification(orderRecord, payload) {
 
   if (!token || !phoneNumberId || !ownerPhone) {
     Logger.log('WhatsApp notification skipped: missing script properties.');
-    return;
+    return 'skipped';
   }
 
   const messageBody = buildWhatsAppMessage(orderRecord, payload);
@@ -142,7 +245,10 @@ function sendWhatsAppNotification(orderRecord, payload) {
   };
 
   const response = UrlFetchApp.fetch(apiUrl, options);
-  Logger.log(`WhatsApp API response: ${response.getResponseCode()} ${response.getContentText()}`);
+  const responseCode = response.getResponseCode();
+  Logger.log(`WhatsApp API response: ${responseCode} ${response.getContentText()}`);
+
+  return responseCode >= 200 && responseCode < 300 ? 'sent' : 'failed';
 }
 
 function buildWhatsAppMessage(orderRecord, payload) {

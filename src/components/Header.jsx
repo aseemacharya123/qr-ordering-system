@@ -1,20 +1,20 @@
 import React from 'react';
+import { normalizeImageUrl } from '../utils/imageUrl.js';
 
 function Header({ businessName, logoUrl, tableNo }) {
   return (
     <div className="page-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <img
-          src={logoUrl}
-          alt={`${businessName} logo`}
-          width="60"
-          height="60"
-          style={{ borderRadius: '16px', objectFit: 'cover' }}
-        />
-        <div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{businessName}</div>
-          {tableNo && <div className="small-tag">Table {tableNo}</div>}
-        </div>
+      <img
+        src={normalizeImageUrl(logoUrl)}
+        alt={`${businessName} logo`}
+        className="header-logo"
+        onError={(event) => {
+          event.currentTarget.style.visibility = 'hidden';
+        }}
+      />
+      <div>
+        <div className="header-title">{businessName}</div>
+        {tableNo && <div className="header-table-badge">Table {tableNo}</div>}
       </div>
     </div>
   );

@@ -2,10 +2,10 @@ const businesses = {
   'cafe-99': {
     businessId: 'cafe-99',
     businessName: 'Cafe 99',
-    logoUrl: 'https://via.placeholder.com/80x80.png?text=Cafe+99',
+    logoUrl: 'https://placehold.co/80x80?text=Cafe+99',
     themeColor: '#4f46e5',
     currency: '₹',
-    apiUrl: 'https://script.google.com/macros/s/AKfycbyoRNyevDjygJo3Hn0tCvegmrSdXUx6gaH3As2ii83-PSXLdZOdYOh2sSzUPNPRfenxEg/exec',
+    apiUrl: 'https://script.google.com/macros/s/AKfycbyiz0qCGwLLXhKoD_nSj8R-iHPD64-hehN-DAE3UkJBNx1rwhxgCSLb1svD4smAYFHcYA/exec',
     reviewLink: 'https://g.page/r/Cafe99/review',
     ownerPhone: '+919000000000',
     isActive: true,

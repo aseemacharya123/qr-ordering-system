@@ -14,6 +14,7 @@ import CheckoutForm from '../components/CheckoutForm.jsx';
 import OrderSuccess from '../components/OrderSuccess.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ErrorState from '../components/ErrorState.jsx';
+import NotFoundPage from './NotFoundPage.jsx';
 
 import { getBusiness } from '../services/businessService.js';
 import { fetchMenu } from '../services/menuService.js';
@@ -48,6 +49,27 @@ function getTableNumber() {
   );
 }
 
+function getBusinessSlug() {
+
+  const pathSegments =
+    window.location.pathname
+      .split('/')
+      .filter(Boolean);
+
+  const menuIndex =
+    pathSegments.indexOf('menu');
+
+  if (
+    menuIndex !== -1 &&
+    pathSegments[menuIndex + 1]
+  ) {
+
+    return pathSegments[menuIndex + 1];
+  }
+
+  return '';
+}
+
 /* ========================================
    COMPONENT
 ======================================== */
@@ -58,7 +80,7 @@ function MenuPage() {
      BUSINESS
   ======================================== */
 
-  const slug = 'cafe-99';
+  const slug = getBusinessSlug();
 
   const business =
     getBusiness(slug);
@@ -222,16 +244,6 @@ function MenuPage() {
               .trim()
               .toLowerCase()
         )
-        .filter((item) => {
-
-          return (
-            String(
-              item.isAvailable
-            )
-              .toLowerCase()
-              .trim() === 'true'
-          );
-        })
         .filter((item) =>
           item.itemName
             .toLowerCase()
@@ -398,6 +410,24 @@ function MenuPage() {
     };
 
   /* ========================================
+     INVALID / INACTIVE BUSINESS
+  ======================================== */
+
+  if (!business) {
+
+    return (
+      <NotFoundPage message="This QR code is not linked to a valid business." />
+    );
+  }
+
+  if (!business.isActive) {
+
+    return (
+      <NotFoundPage message="This business is currently unavailable." />
+    );
+  }
+
+  /* ========================================
      SUCCESS
   ======================================== */
 
@@ -419,7 +449,7 @@ function MenuPage() {
 
   return (
 
-    <div className="container">
+    <>
 
       <Header
         businessName={
@@ -428,6 +458,8 @@ function MenuPage() {
         logoUrl={business.logoUrl}
         tableNo={tableNo}
       />
+
+      <div className="container">
 
       <SearchBar
         searchTerm={searchTerm}
@@ -451,12 +483,12 @@ function MenuPage() {
       {filteredItems.length === 0 ? (
 
         <div
-          className="empty-box card"
+          className="card state-box"
           style={{
             marginTop: '16px',
           }}
         >
-          No items found for this category or search.
+          <p className="state-message">No items found for this category or search.</p>
         </div>
 
       ) : (
@@ -524,7 +556,7 @@ function MenuPage() {
         }}
       >
 
-        <h2>Checkout</h2>
+        <h2 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '16px' }}>Checkout</h2>
 
         <CheckoutForm
           customerName={
@@ -545,7 +577,9 @@ function MenuPage() {
 
       </div>
 
-    </div>
+      </div>
+
+    </>
   );
 }
 
