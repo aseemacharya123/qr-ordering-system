@@ -5,12 +5,14 @@ import CategoryBreakdown from '../components/dashboard/CategoryBreakdown.jsx';
 import TopBottomItems from '../components/dashboard/TopBottomItems.jsx';
 import RecentOrders from '../components/dashboard/RecentOrders.jsx';
 import AIInsights from '../components/dashboard/AIInsights.jsx';
+import OperationsSummary from '../components/dashboard/OperationsSummary.jsx';
+import BreakAndClosureRecommendations from '../components/dashboard/BreakAndClosureRecommendations.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 
 import { fetchDashboard, fetchAiInsights } from '../services/ownerService.js';
 import { clearToken } from '../utils/ownerSession.js';
 import { formatCurrency } from '../utils/currency.js';
-import { sampleDashboardSummary } from '../config/sampleDashboardData.js';
+import { sampleDashboardSummary, sampleOperationsSummary } from '../config/sampleDashboardData.js';
 
 function StatTile({ label, value }) {
   return (
@@ -23,6 +25,7 @@ function StatTile({ label, value }) {
 
 function OwnerDashboard({ business, token, onLogout }) {
   const [summary, setSummary] = useState(null);
+  const [operations, setOperations] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [usingSampleData, setUsingSampleData] = useState(false);
 
@@ -41,6 +44,7 @@ function OwnerDashboard({ business, token, onLogout }) {
 
         if (response.success) {
           setSummary(response.summary);
+          setOperations(response.operations);
         } else if (response.error === 'Unauthorized') {
           onLogout();
         } else {
@@ -49,6 +53,7 @@ function OwnerDashboard({ business, token, onLogout }) {
       } catch (error) {
         if (cancelled) return;
         setSummary(sampleDashboardSummary);
+        setOperations(sampleOperationsSummary);
         setUsingSampleData(true);
       } finally {
         if (!cancelled) {
@@ -134,6 +139,16 @@ function OwnerDashboard({ business, token, onLogout }) {
       <div className="card">
         <h2 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '16px' }}>Item Performance</h2>
         <TopBottomItems topItems={summary.topItems} bottomItems={summary.bottomItems} />
+      </div>
+
+      <div className="card">
+        <h2 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '16px' }}>Demand Heatmap</h2>
+        <OperationsSummary heatmap={operations?.staffingGuidance?.heatmap} />
+      </div>
+
+      <div className="card">
+        <h2 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '16px' }}>Operations Recommendations</h2>
+        <BreakAndClosureRecommendations operations={operations} />
       </div>
 
       <div className="card">
