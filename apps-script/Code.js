@@ -289,8 +289,17 @@ function handleDashboardRequest(payload) {
   return buildJsonResponse({
     success: true,
     summary: buildOrderSummary(orders),
-    operations: buildOperationsSummary(orders),
+    operations: buildOperationsSummarySafely(orders),
   });
+}
+
+function buildOperationsSummarySafely(orders) {
+  try {
+    return buildOperationsSummary(orders);
+  } catch (error) {
+    Logger.log(`Operations summary failed: ${error.message}`);
+    return { hasEnoughData: false, weeksOfDataAnalyzed: 0, totalOrders: orders.length };
+  }
 }
 
 function buildOrderSummary(orders) {
@@ -554,15 +563,30 @@ function formatBucketTime(bucketIndex) {
 }
 
 function findBestWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, excludedBuckets) {
-  const result = searchWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, excludedBuckets);
-
-  if (result) {
-    return result;
+  const withinRange = searchWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, excludedBuckets);
+  if (withinRange) {
+    return withinRange;
   }
 
-  // Fallback: every candidate window overlapped the excluded (peak-buffer) zone.
+  // Fallback 1: every candidate window overlapped the excluded (peak-buffer) zone.
   // Rather than return nothing, ignore the exclusion so we still give a usable answer.
-  return searchWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, null);
+  const ignoringExclusion = searchWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, null);
+  if (ignoringExclusion) {
+    return ignoringExclusion;
+  }
+
+  // Fallback 2: the operating range itself is narrower than the window (e.g. all historical
+  // orders cluster within a very short span of the day). Search the full day so callers always
+  // get a real window instead of null and crashing downstream.
+  const fullDay = searchWindow(bucketValues, windowSize, 0, BUCKETS_PER_DAY, mode, null);
+  if (fullDay) {
+    return fullDay;
+  }
+
+  // Fallback 3: should be unreachable (windowSize always <= BUCKETS_PER_DAY), but never return
+  // null from this function — a degenerate zero-length window is safer than a crash.
+  const safeStart = Math.max(0, Math.min(rangeStart, BUCKETS_PER_DAY - windowSize));
+  return { startBucket: safeStart, endBucket: safeStart + windowSize, value: 0 };
 }
 
 function searchWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, excludedBuckets) {
@@ -599,6 +623,10 @@ function searchWindow(bucketValues, windowSize, rangeStart, rangeEnd, mode, excl
 }
 
 function formatWindow(window) {
+  if (!window) {
+    return { startBucket: 0, endBucket: 0, startLabel: 'N/A', endLabel: 'N/A', value: 0 };
+  }
+
   return {
     startBucket: window.startBucket,
     endBucket: window.endBucket,
@@ -780,7 +808,7 @@ function handleAiInsightsRequest(payload) {
 
   const orders = readSheetAsObjects('Orders');
   const summary = buildOrderSummary(orders);
-  const operations = buildOperationsSummary(orders);
+  const operations = buildOperationsSummarySafely(orders);
   const insights = generateAiInsights(summary, operations);
 
   cache.put(cacheKey, insights, AI_INSIGHTS_CACHE_TTL_SECONDS);

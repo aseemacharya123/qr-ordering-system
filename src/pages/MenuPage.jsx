@@ -18,6 +18,7 @@ import NotFoundPage from './NotFoundPage.jsx';
 import LandingPage from './LandingPage.jsx';
 import OwnerLogin from './OwnerLogin.jsx';
 import OwnerDashboard from './OwnerDashboard.jsx';
+import DashboardErrorBoundary from '../components/DashboardErrorBoundary.jsx';
 
 import { getBusiness } from '../services/businessService.js';
 import { fetchMenu } from '../services/menuService.js';
@@ -505,11 +506,13 @@ function MenuPage() {
   if (view === 'owner') {
 
     return (
-      <OwnerDashboard
-        business={business}
-        token={ownerToken}
-        onLogout={handleOwnerLogout}
-      />
+      <DashboardErrorBoundary>
+        <OwnerDashboard
+          business={business}
+          token={ownerToken}
+          onLogout={handleOwnerLogout}
+        />
+      </DashboardErrorBoundary>
     );
   }
 

@@ -17,7 +17,7 @@ function DayAnalysisList({ dayAnalysis }) {
         <div key={day.dayName} className="cart-item" style={{ display: 'block' }}>
           <div style={{ fontWeight: 700, marginBottom: '4px' }}>{day.dayName}</div>
           <div className="small-tag">
-            Peak: {day.peakRevenueWindow.startLabel} – {day.peakRevenueWindow.endLabel}
+            Peak: {day.peakRevenueWindow?.startLabel} – {day.peakRevenueWindow?.endLabel}
             {day.lowDemandWindow && ` · Low: ${day.lowDemandWindow.startLabel} – ${day.lowDemandWindow.endLabel}`}
           </div>
         </div>
