@@ -1,3 +1,4 @@
 export function formatCurrency(value, currencySymbol = '₹') {
-  return `${currencySymbol}${value.toFixed(0)}`;
+  const numericValue = Number(value) || 0;
+  return `${currencySymbol}${numericValue.toFixed(0)}`;
 }

@@ -398,7 +398,7 @@ function buildOrderSummary(orders) {
       createdAt: order['Created At'],
       customerName: order['Customer Name'],
       tableNo: order['Table No'],
-      totalAmount: order['Total Amount'],
+      totalAmount: Number(order['Total Amount'] || 0),
     })),
   };
 }
