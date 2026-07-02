@@ -1,6 +1,6 @@
 import React from 'react';
 
-function LandingPage({ businessName, logoUrl, onSelectOrder, onSelectOwner }) {
+function LandingPage({ businessName, logoUrl, onSelectOrder, onSelectOwner, onSelectStaff }) {
   return (
     <div className="container" style={{ paddingTop: '48px' }}>
       <div className="state-box" style={{ marginBottom: '32px' }}>
@@ -38,6 +38,16 @@ function LandingPage({ businessName, logoUrl, onSelectOrder, onSelectOwner }) {
           onClick={onSelectOwner}
         >
           I am the Owner
+        </button>
+      </div>
+
+      <div style={{ textAlign: 'center', marginTop: '20px' }}>
+        <button
+          type="button"
+          onClick={onSelectStaff}
+          style={{ border: 'none', background: 'none', padding: 0, color: 'var(--color-text-muted, #888)', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+        >
+          Staff / Kitchen Login
         </button>
       </div>
     </div>

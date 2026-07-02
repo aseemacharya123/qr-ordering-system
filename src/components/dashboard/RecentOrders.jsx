@@ -14,6 +14,8 @@ function RecentOrders({ orders }) {
             <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{order.customerName}</div>
             <div className="small-tag">
               {order.orderId}{order.tableNo ? ` · Table ${order.tableNo}` : ''}
+              {order.status ? ` · ${order.status}` : ''}
+              {order.paymentStatus ? ` · ${order.paymentStatus}` : ''}
             </div>
           </div>
           <div style={{ fontWeight: 700 }}>{formatCurrency(order.totalAmount)}</div>

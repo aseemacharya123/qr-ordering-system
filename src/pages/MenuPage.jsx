@@ -18,10 +18,13 @@ import NotFoundPage from './NotFoundPage.jsx';
 import LandingPage from './LandingPage.jsx';
 import OwnerLogin from './OwnerLogin.jsx';
 import OwnerDashboard from './OwnerDashboard.jsx';
+import StaffLogin from './StaffLogin.jsx';
+import StaffDashboard from './StaffDashboard.jsx';
 import DashboardErrorBoundary from '../components/DashboardErrorBoundary.jsx';
+import UpiPaymentPanel from '../components/UpiPaymentPanel.jsx';
 
 import { getBusiness } from '../services/businessService.js';
-import { fetchMenu } from '../services/menuService.js';
+import { fetchMenu, fetchBusinessSettings } from '../services/menuService.js';
 
 import {
   addItemToCart,
@@ -37,6 +40,7 @@ import { formatOrderPayload } from '../utils/orderFormatter.js';
 
 import { submitOrder } from '../services/orderService.js';
 import { getToken, saveToken } from '../utils/ownerSession.js';
+import { getToken as getStaffToken, saveToken as saveStaffToken } from '../utils/staffSession.js';
 
 /* ========================================
    HELPERS
@@ -75,12 +79,23 @@ function getBusinessSlug() {
   return '';
 }
 
+function isStaffEntryRequested() {
+
+  const searchParams =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  return searchParams.get('staff') === '1';
+}
+
 const DEFAULT_CHECKOUT_FIELDS = {
   customerName: '',
   customerPhone: '',
   age: '',
   gender: '',
   society: '',
+  paymentMethod: 'Cash',
 };
 
 /* ========================================
@@ -106,12 +121,30 @@ function MenuPage() {
   ======================================== */
 
   const [view, setView] = useState(
-    tableNo ? 'customer' : 'landing'
+    () => {
+      if (isStaffEntryRequested()) {
+        return 'staffLogin';
+      }
+      return tableNo ? 'customer' : 'landing';
+    }
   );
 
   const [ownerToken, setOwnerToken] = useState(
     () => (business ? getToken(business.businessId) : '')
   );
+
+  const [staffToken, setStaffToken] = useState(
+    () => (business ? getStaffToken(business.businessId) : '')
+  );
+
+  const [businessSettings, setBusinessSettings] = useState({
+    upiId: '',
+    upiPayeeName: '',
+  });
+
+  const [upiPanelDismissed, setUpiPanelDismissed] = useState(false);
+
+  const [lastOrderTotal, setLastOrderTotal] = useState(0);
 
   const [searchTerm, setSearchTerm] =
     useState('');
@@ -186,9 +219,20 @@ function MenuPage() {
       }
     }
 
+    async function loadSettings() {
+
+      const settings =
+        await fetchBusinessSettings(
+          business.apiUrl
+        );
+
+      setBusinessSettings(settings);
+    }
+
     if (business?.apiUrl) {
 
       loadMenu();
+      loadSettings();
     }
 
   }, [business]);
@@ -385,6 +429,33 @@ function MenuPage() {
   };
 
   /* ========================================
+     STAFF VIEW
+  ======================================== */
+
+  const handleSelectStaff = () => {
+    const existingToken = getStaffToken(business.businessId);
+
+    if (existingToken) {
+      setStaffToken(existingToken);
+      setView('staff');
+      return;
+    }
+
+    setView('staffLogin');
+  };
+
+  const handleStaffLoginSuccess = (token) => {
+    saveStaffToken(business.businessId, token);
+    setStaffToken(token);
+    setView('staff');
+  };
+
+  const handleStaffLogout = () => {
+    setStaffToken('');
+    setView('landing');
+  };
+
+  /* ========================================
      SUBMIT ORDER
   ======================================== */
 
@@ -423,6 +494,7 @@ function MenuPage() {
             age: checkoutFields.age,
             gender: checkoutFields.gender,
             society: checkoutFields.society,
+            paymentMethod: checkoutFields.paymentMethod,
           }
         );
 
@@ -439,6 +511,12 @@ function MenuPage() {
         setOrderId(
           response.orderId
         );
+
+        setLastOrderTotal(
+          payload.totalAmount
+        );
+
+        setUpiPanelDismissed(false);
 
         setCartItems([]);
 
@@ -488,6 +566,7 @@ function MenuPage() {
         logoUrl={business.logoUrl}
         onSelectOrder={handleSelectOrder}
         onSelectOwner={handleSelectOwner}
+        onSelectStaff={handleSelectStaff}
       />
     );
   }
@@ -516,11 +595,57 @@ function MenuPage() {
     );
   }
 
+  if (view === 'staffLogin') {
+
+    return (
+      <StaffLogin
+        apiUrl={business.apiUrl}
+        onLoginSuccess={handleStaffLoginSuccess}
+        onBack={() => setView('landing')}
+      />
+    );
+  }
+
+  if (view === 'staff') {
+
+    return (
+      <DashboardErrorBoundary>
+        <StaffDashboard
+          business={business}
+          token={staffToken}
+          onLogout={handleStaffLogout}
+        />
+      </DashboardErrorBoundary>
+    );
+  }
+
   /* ========================================
      SUCCESS
   ======================================== */
 
   if (orderId) {
+
+    if (
+      checkoutFields.paymentMethod === 'UPI' &&
+      businessSettings.upiId &&
+      !upiPanelDismissed
+    ) {
+
+      return (
+        <div className="container">
+          <UpiPaymentPanel
+            apiUrl={business.apiUrl}
+            orderId={orderId}
+            customerPhone={checkoutFields.customerPhone}
+            totalAmount={lastOrderTotal}
+            businessName={business.businessName}
+            upiId={businessSettings.upiId}
+            upiPayeeName={businessSettings.upiPayeeName}
+            onDone={() => setUpiPanelDismissed(true)}
+          />
+        </div>
+      );
+    }
 
     return (
       <OrderSuccess
@@ -657,6 +782,7 @@ function MenuPage() {
           }
           errors={errors}
           disabled={isSubmitting}
+          upiAvailable={Boolean(businessSettings.upiId)}
         />
 
       </div>

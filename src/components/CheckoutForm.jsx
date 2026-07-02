@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function CheckoutForm({ fields, onChange, onSubmit, errors, disabled }) {
+function CheckoutForm({ fields, onChange, onSubmit, errors, disabled, upiAvailable }) {
   const [showMoreDetails, setShowMoreDetails] = useState(false);
 
   return (
@@ -95,6 +95,28 @@ function CheckoutForm({ fields, onChange, onSubmit, errors, disabled }) {
           </div>
         )}
       </div>
+
+      {upiAvailable && (
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>Payment</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <button
+              type="button"
+              className={fields.paymentMethod === 'UPI' ? 'button button-secondary' : 'button button-primary'}
+              onClick={() => onChange('paymentMethod', 'Cash')}
+            >
+              Pay at Counter
+            </button>
+            <button
+              type="button"
+              className={fields.paymentMethod === 'UPI' ? 'button button-primary' : 'button button-secondary'}
+              onClick={() => onChange('paymentMethod', 'UPI')}
+            >
+              Pay via UPI
+            </button>
+          </div>
+        </div>
+      )}
 
       {errors.cart && <div className="error-text">{errors.cart}</div>}
 

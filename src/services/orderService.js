@@ -24,3 +24,12 @@ export async function submitOrder(apiUrl, payload) {
 
   return data;
 }
+
+export async function confirmUpiPaymentSent(apiUrl, { orderId, customerPhone, upiRef }) {
+  return submitOrder(apiUrl, {
+    action: 'confirmUpiPaymentSent',
+    orderId,
+    customerPhone,
+    upiRef: upiRef || '',
+  });
+}

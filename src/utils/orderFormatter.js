@@ -21,5 +21,6 @@ export function formatOrderPayload(business, tableNo, customerName, customerPhon
     age: extraFields.age || '',
     gender: extraFields.gender || '',
     society: extraFields.society || '',
+    paymentMethod: extraFields.paymentMethod === 'UPI' ? 'UPI' : 'Cash',
   };
 }

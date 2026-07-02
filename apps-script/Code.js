@@ -1,5 +1,6 @@
 const WHATSAPP_API_VERSION = 'v17.0';
-const CLAUDE_MODEL = 'claude-opus-4-8';
+const CLAUDE_MODEL = 'claude-fable-5';
+const CLAUDE_FALLBACK_MODEL = 'claude-opus-4-8';
 const OWNER_SESSION_TTL_SECONDS = 6 * 60 * 60;
 const AI_INSIGHTS_CACHE_TTL_SECONDS = 60 * 60;
 
@@ -11,6 +12,15 @@ function doGet(e) {
       success: true,
       categories: readSheetAsObjects('Categories'),
       items: readSheetAsObjects('MenuItems'),
+    });
+  }
+
+  if (action === 'settings') {
+    const settings = getSettingsSheetAsMap();
+    return buildJsonResponse({
+      success: true,
+      upiId: settings.upiId || '',
+      upiPayeeName: settings.upiPayeeName || '',
     });
   }
 
@@ -51,6 +61,44 @@ function readSheetAsObjects(sheetName) {
 }
 
 /* ========================================
+   SETTINGS
+   (owner-editable, non-secret business info —
+   e.g. UPI ID — stored as Key/Value rows so
+   owners can update it themselves in the Sheet
+   without asking for a code change)
+======================================== */
+
+function getSettingsSheet() {
+  const spreadSheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadSheet.getSheetByName('Settings');
+
+  if (!sheet) {
+    sheet = spreadSheet.insertSheet('Settings');
+    sheet.appendRow(['Key', 'Value']);
+    sheet.appendRow(['upiId', '']);
+    sheet.appendRow(['upiPayeeName', '']);
+  }
+
+  return sheet;
+}
+
+function getSettingsSheetAsMap() {
+  const sheet = getSettingsSheet();
+  const values = sheet.getDataRange().getValues();
+  const settings = {};
+
+  for (let i = 1; i < values.length; i++) {
+    const key = values[i][0];
+    const value = values[i][1];
+    if (key) {
+      settings[String(key).trim()] = value === null || value === undefined ? '' : String(value).trim();
+    }
+  }
+
+  return settings;
+}
+
+/* ========================================
    REQUEST ROUTING
 ======================================== */
 
@@ -70,6 +118,16 @@ function doPost(e) {
         return handleDashboardRequest(payload);
       case 'aiInsights':
         return handleAiInsightsRequest(payload);
+      case 'verifyStaffPin':
+        return handleVerifyStaffPin(payload);
+      case 'kitchenOrders':
+        return handleKitchenOrdersRequest(payload);
+      case 'updateOrderStatus':
+        return handleUpdateOrderStatus(payload);
+      case 'markOrderPaid':
+        return handleMarkOrderPaid(payload);
+      case 'confirmUpiPaymentSent':
+        return handleConfirmUpiPaymentSent(payload);
       default:
         return handleOrderSubmission(payload);
     }
@@ -82,6 +140,8 @@ function doPost(e) {
    ORDER SUBMISSION
 ======================================== */
 
+const VALID_PAYMENT_METHODS = ['Cash', 'UPI'];
+
 function handleOrderSubmission(payload) {
   const validation = validateOrderPayload(payload);
 
@@ -90,9 +150,12 @@ function handleOrderSubmission(payload) {
   }
 
   const orderId = generateOrderId();
+  const paymentMethod = VALID_PAYMENT_METHODS.includes(payload.paymentMethod) ? payload.paymentMethod : 'Cash';
+  const createdAt = new Date().toISOString();
+
   const orderRecord = {
     orderId,
-    createdAt: new Date().toISOString(),
+    createdAt,
     businessId: payload.businessId,
     businessName: payload.businessName,
     tableNo: payload.tableNo || '',
@@ -104,6 +167,11 @@ function handleOrderSubmission(payload) {
     age: payload.age || '',
     gender: payload.gender || '',
     society: payload.society || '',
+    status: 'Received',
+    paymentMethod,
+    paymentStatus: paymentMethod === 'UPI' ? 'Awaiting confirmation' : 'Pay at counter',
+    upiRef: '',
+    updatedAt: createdAt,
   };
 
   saveOrderToSheet(orderRecord);
@@ -111,7 +179,7 @@ function handleOrderSubmission(payload) {
 
   const notificationStatus = sendWhatsAppNotificationSafely(orderRecord, payload);
 
-  return buildJsonResponse({ success: true, orderId, notificationStatus });
+  return buildJsonResponse({ success: true, orderId, notificationStatus, paymentMethod, paymentStatus: orderRecord.paymentStatus });
 }
 
 function validateOrderPayload(payload) {
@@ -142,6 +210,12 @@ function generateOrderId() {
   return `ORD-${datePart}-${timePart}`;
 }
 
+// Columns added after the original 10-column layout. Kept in a fixed order and always
+// appended to the END of the header row so existing deployed sheets (with real order
+// history already in the original 10 columns) migrate in place with no manual editing.
+const ORDER_STATUS_COLUMNS = ['Status', 'Payment Method', 'Payment Status', 'UPI Ref', 'Updated At'];
+const ORDER_STATUSES = ['Received', 'Preparing', 'Ready', 'Completed', 'Cancelled'];
+
 function saveOrderToSheet(orderRecord) {
   const sheet = getOrdersSheet();
   sheet.appendRow([
@@ -155,6 +229,11 @@ function saveOrderToSheet(orderRecord) {
     orderRecord.totalAmount,
     orderRecord.items,
     orderRecord.source,
+    orderRecord.status,
+    orderRecord.paymentMethod,
+    orderRecord.paymentStatus,
+    orderRecord.upiRef,
+    orderRecord.updatedAt,
   ]);
 }
 
@@ -175,10 +254,42 @@ function getOrdersSheet() {
       'Total Amount',
       'Items',
       'Source',
+      ...ORDER_STATUS_COLUMNS,
     ]);
+    return sheet;
   }
 
+  ensureOrdersSheetSchema(sheet);
   return sheet;
+}
+
+// Adds any missing status/payment columns to an Orders sheet created before this feature
+// existed. Existing rows simply get blank cells for the new columns — readers below treat
+// a blank Status as a legacy/completed order, so nothing downstream breaks.
+function ensureOrdersSheetSchema(sheet) {
+  const lastColumn = sheet.getLastColumn();
+  const headerRow = lastColumn > 0 ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0] : [];
+  const missingColumns = ORDER_STATUS_COLUMNS.filter((column) => headerRow.indexOf(column) === -1);
+
+  if (missingColumns.length === 0) {
+    return;
+  }
+
+  sheet.getRange(1, lastColumn + 1, 1, missingColumns.length).setValues([missingColumns]);
+}
+
+function findOrderRow(sheet, orderId) {
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const orderIdColumn = headers.indexOf('Order ID');
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][orderIdColumn]) === String(orderId)) {
+      return { rowIndex: i + 1, headers, row: values[i] };
+    }
+  }
+
+  return null;
 }
 
 function saveOrUpdateCustomer(orderRecord) {
@@ -273,6 +384,34 @@ function isValidOwnerToken(token) {
   }
 
   return CacheService.getScriptCache().get(`owner_session_${token}`) === 'valid';
+}
+
+// Staff PIN is optional. If unset, the owner's own PIN also unlocks the kitchen/staff view
+// (so a solo owner isn't blocked from setting up staff features before hiring anyone).
+function handleVerifyStaffPin(payload) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const staffPin = scriptProperties.getProperty('STAFF_PIN') || scriptProperties.getProperty('OWNER_PIN');
+
+  if (!staffPin || !payload.pin || String(payload.pin) !== String(staffPin)) {
+    return buildJsonResponse({ success: false, error: 'Incorrect PIN.' });
+  }
+
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put(`staff_session_${token}`, 'valid', OWNER_SESSION_TTL_SECONDS);
+
+  return buildJsonResponse({ success: true, token });
+}
+
+// A staff token only grants access to the kitchen queue, never the revenue dashboard or AI
+// insights — isValidOwnerToken() above stays strict. An owner token is also accepted here
+// so the owner can always reach the kitchen view with the same login they already use.
+function isValidStaffToken(token) {
+  if (!token) {
+    return false;
+  }
+
+  const cache = CacheService.getScriptCache();
+  return cache.get(`staff_session_${token}`) === 'valid' || cache.get(`owner_session_${token}`) === 'valid';
 }
 
 /* ========================================
@@ -399,6 +538,8 @@ function buildOrderSummary(orders) {
       customerName: order['Customer Name'],
       tableNo: order['Table No'],
       totalAmount: Number(order['Total Amount'] || 0),
+      status: order['Status'] || 'Received',
+      paymentStatus: order['Payment Status'] || 'Pay at counter',
     })),
   };
 }
@@ -415,6 +556,166 @@ function getMonthKey(isoDateString) {
 
   const pad = (value) => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+}
+
+/* ========================================
+   KITCHEN / STAFF ORDER QUEUE
+======================================== */
+
+const KITCHEN_QUEUE_LOOKBACK_HOURS = 24;
+const KITCHEN_QUEUE_MAX_ORDERS = 100;
+const ACTIVE_ORDER_STATUSES = ['Received', 'Preparing', 'Ready'];
+
+function handleKitchenOrdersRequest(payload) {
+  if (!isValidStaffToken(payload.token)) {
+    return buildJsonResponse({ success: false, error: 'Unauthorized' });
+  }
+
+  const orders = readSheetAsObjects('Orders');
+  const cutoff = new Date(Date.now() - KITCHEN_QUEUE_LOOKBACK_HOURS * 60 * 60 * 1000);
+
+  const activeOrders = orders
+    .filter((order) => {
+      const createdAt = new Date(order['Created At']);
+      if (isNaN(createdAt.getTime()) || createdAt < cutoff) {
+        return false;
+      }
+      // Blank Status means the order predates this feature — treat it as already handled
+      // rather than surfacing old history in a "new" kitchen queue.
+      const status = order['Status'] || 'Received';
+      return ACTIVE_ORDER_STATUSES.indexOf(status) !== -1;
+    })
+    .map((order) => {
+      let items = [];
+      try {
+        items = JSON.parse(order['Items'] || '[]');
+      } catch (error) {
+        items = [];
+      }
+
+      return {
+        orderId: order['Order ID'],
+        createdAt: order['Created At'],
+        tableNo: order['Table No'],
+        customerName: order['Customer Name'],
+        customerPhone: order['Customer Phone'],
+        totalAmount: Number(order['Total Amount'] || 0),
+        items,
+        status: order['Status'] || 'Received',
+        paymentMethod: order['Payment Method'] || 'Cash',
+        paymentStatus: order['Payment Status'] || 'Pay at counter',
+      };
+    })
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .slice(0, KITCHEN_QUEUE_MAX_ORDERS);
+
+  return buildJsonResponse({ success: true, orders: activeOrders });
+}
+
+function handleUpdateOrderStatus(payload) {
+  if (!isValidStaffToken(payload.token)) {
+    return buildJsonResponse({ success: false, error: 'Unauthorized' });
+  }
+
+  if (ORDER_STATUSES.indexOf(payload.status) === -1) {
+    return buildJsonResponse({ success: false, error: 'Invalid status.' });
+  }
+
+  const sheet = getOrdersSheet();
+  const found = findOrderRow(sheet, payload.orderId);
+
+  if (!found) {
+    return buildJsonResponse({ success: false, error: 'Order not found.' });
+  }
+
+  const { rowIndex, headers, row } = found;
+  const now = new Date().toISOString();
+
+  setCellByHeader(sheet, rowIndex, headers, 'Status', payload.status);
+  setCellByHeader(sheet, rowIndex, headers, 'Updated At', now);
+
+  if (payload.status === 'Ready' || payload.status === 'Cancelled') {
+    const orderRecord = rowToOrderRecord(headers, row);
+    sendCustomerStatusUpdateSafely(orderRecord, payload.status);
+  }
+
+  return buildJsonResponse({ success: true, orderId: payload.orderId, status: payload.status });
+}
+
+function handleMarkOrderPaid(payload) {
+  if (!isValidStaffToken(payload.token)) {
+    return buildJsonResponse({ success: false, error: 'Unauthorized' });
+  }
+
+  const sheet = getOrdersSheet();
+  const found = findOrderRow(sheet, payload.orderId);
+
+  if (!found) {
+    return buildJsonResponse({ success: false, error: 'Order not found.' });
+  }
+
+  const { rowIndex, headers } = found;
+
+  setCellByHeader(sheet, rowIndex, headers, 'Payment Status', 'Paid');
+  setCellByHeader(sheet, rowIndex, headers, 'Updated At', new Date().toISOString());
+
+  return buildJsonResponse({ success: true, orderId: payload.orderId, paymentStatus: 'Paid' });
+}
+
+// Customer-initiated (no staff token — the customer isn't logged in). Only flips a UPI order
+// from "Awaiting confirmation" to "Customer confirmed - awaiting staff": it can never mark an
+// order fully Paid by itself, so a customer can't self-declare payment and walk out. Staff
+// still has to confirm via markOrderPaid after checking the soundbox/PSP app.
+function handleConfirmUpiPaymentSent(payload) {
+  const sheet = getOrdersSheet();
+  const found = findOrderRow(sheet, payload.orderId);
+
+  if (!found) {
+    return buildJsonResponse({ success: false, error: 'Order not found.' });
+  }
+
+  const { rowIndex, headers, row } = found;
+  const orderRecord = rowToOrderRecord(headers, row);
+
+  if (String(orderRecord.customerPhone) !== String(payload.customerPhone)) {
+    return buildJsonResponse({ success: false, error: 'Unauthorized' });
+  }
+
+  if (orderRecord.paymentStatus !== 'Awaiting confirmation') {
+    return buildJsonResponse({ success: true, orderId: payload.orderId, paymentStatus: orderRecord.paymentStatus });
+  }
+
+  setCellByHeader(sheet, rowIndex, headers, 'Payment Status', 'Customer confirmed - awaiting staff');
+  setCellByHeader(sheet, rowIndex, headers, 'Updated At', new Date().toISOString());
+  if (payload.upiRef) {
+    setCellByHeader(sheet, rowIndex, headers, 'UPI Ref', String(payload.upiRef).slice(0, 64));
+  }
+
+  return buildJsonResponse({ success: true, orderId: payload.orderId, paymentStatus: 'Customer confirmed - awaiting staff' });
+}
+
+function setCellByHeader(sheet, rowIndex, headers, headerName, value) {
+  const columnIndex = headers.indexOf(headerName);
+  if (columnIndex === -1) {
+    return;
+  }
+  sheet.getRange(rowIndex, columnIndex + 1).setValue(value);
+}
+
+function rowToOrderRecord(headers, row) {
+  const record = {};
+  headers.forEach((header, index) => {
+    record[header] = row[index];
+  });
+
+  return {
+    orderId: record['Order ID'],
+    businessName: record['Business Name'],
+    tableNo: record['Table No'],
+    customerName: record['Customer Name'],
+    customerPhone: record['Customer Phone'],
+    totalAmount: record['Total Amount'],
+  };
 }
 
 /* ========================================
@@ -832,11 +1133,13 @@ function generateAiInsights(summary, operations) {
     headers: {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'server-side-fallback-2026-06-01',
     },
     payload: JSON.stringify({
       model: CLAUDE_MODEL,
       max_tokens: 1024,
       output_config: { effort: 'medium' },
+      fallbacks: [{ model: CLAUDE_FALLBACK_MODEL }],
       messages: [
         { role: 'user', content: prompt },
       ],
@@ -909,16 +1212,29 @@ function sendWhatsAppNotificationSafely(orderRecord, payload) {
 
 function sendWhatsAppNotification(orderRecord, payload) {
   const scriptProperties = PropertiesService.getScriptProperties();
-  const token = scriptProperties.getProperty('WHATSAPP_TOKEN');
-  const phoneNumberId = scriptProperties.getProperty('WHATSAPP_PHONE_NUMBER_ID');
   const ownerPhone = scriptProperties.getProperty('BUSINESS_OWNER_PHONE');
 
-  if (!token || !phoneNumberId || !ownerPhone) {
-    Logger.log('WhatsApp notification skipped: missing script properties.');
+  if (!ownerPhone) {
+    Logger.log('WhatsApp notification skipped: missing BUSINESS_OWNER_PHONE.');
     return 'skipped';
   }
 
   const messageBody = buildWhatsAppMessage(orderRecord, payload);
+  return sendWhatsAppMessage(ownerPhone, messageBody);
+}
+
+// Generic WhatsApp Cloud API sender, shared by the owner order alert and the
+// customer-facing status updates below. Returns 'sent' / 'failed' / 'skipped'
+// and never throws — callers wrap this in a *Safely() variant regardless.
+function sendWhatsAppMessage(toPhone, messageBody) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const token = scriptProperties.getProperty('WHATSAPP_TOKEN');
+  const phoneNumberId = scriptProperties.getProperty('WHATSAPP_PHONE_NUMBER_ID');
+
+  if (!token || !phoneNumberId || !toPhone) {
+    Logger.log('WhatsApp message skipped: missing script properties or recipient.');
+    return 'skipped';
+  }
 
   const apiUrl = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
   const options = {
@@ -929,7 +1245,7 @@ function sendWhatsAppNotification(orderRecord, payload) {
     },
     payload: JSON.stringify({
       messaging_product: 'whatsapp',
-      to: ownerPhone,
+      to: toPhone,
       type: 'text',
       text: {
         body: messageBody,
@@ -954,6 +1270,48 @@ function buildWhatsAppMessage(orderRecord, payload) {
     .join('\n');
 
   return `${header}\n${tableLabel}\n${customer}\n\nItems:\n${itemsText}\n\nTotal: ₹${orderRecord.totalAmount}`;
+}
+
+// Formats a stored 10-digit Indian mobile number for the WhatsApp Cloud API, which expects
+// digits only with a country code (e.g. 919876543210). Already-prefixed numbers pass through.
+function toWhatsAppPhoneFormat(phone) {
+  const digitsOnly = String(phone || '').replace(/\D/g, '');
+
+  if (digitsOnly.length === 10) {
+    return `91${digitsOnly}`;
+  }
+
+  return digitsOnly;
+}
+
+function sendCustomerStatusUpdateSafely(orderRecord, status) {
+  try {
+    return sendCustomerStatusUpdate(orderRecord, status);
+  } catch (error) {
+    Logger.log(`Customer status update failed: ${error.message}`);
+    return 'failed';
+  }
+}
+
+function sendCustomerStatusUpdate(orderRecord, status) {
+  const customerPhone = toWhatsAppPhoneFormat(orderRecord.customerPhone);
+
+  if (!customerPhone) {
+    return 'skipped';
+  }
+
+  const tableLabel = orderRecord.tableNo ? ` (Table ${orderRecord.tableNo})` : '';
+  let messageBody;
+
+  if (status === 'Ready') {
+    messageBody = `Hi ${orderRecord.customerName}, your order ${orderRecord.orderId}${tableLabel} from ${orderRecord.businessName} is ready! Total: ₹${orderRecord.totalAmount}.`;
+  } else if (status === 'Cancelled') {
+    messageBody = `Hi ${orderRecord.customerName}, your order ${orderRecord.orderId} from ${orderRecord.businessName} was cancelled. Please speak to the staff if you have questions.`;
+  } else {
+    return 'skipped';
+  }
+
+  return sendWhatsAppMessage(customerPhone, messageBody);
 }
 
 function buildJsonResponse(payload) {
